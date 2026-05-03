@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'scanner_provider.dart';
 
@@ -14,10 +15,7 @@ class ScannerScreen extends ConsumerWidget {
       next.when(
         data: (_) {
           if (ref.read(scannedReceiptProvider) != null) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               const SnackBar(content: Text('Berhasil! Data siap di-review.'), backgroundColor: Colors.green)
-             );
-             // Navigator ke validation page jika ada
+              context.push('/validation');
           }
         },
         error: (err, stack) {

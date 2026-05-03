@@ -5,6 +5,7 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/scanner/presentation/scanner_screen.dart';
+import '../../features/scanner/presentation/validation_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -15,6 +16,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/dashboard', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/scanner', builder: (context, state) => const ScannerScreen()),
+      GoRoute(path: '/validation', builder: (context, state) => const ValidationScreen()),
     ],
   );
 });
