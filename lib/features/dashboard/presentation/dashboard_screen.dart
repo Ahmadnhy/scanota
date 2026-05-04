@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../transactions/data/transaction_repository.dart';
+import '../../auth/presentation/auth_provider.dart';
+import 'widgets/report_view.dart';
+import 'edit_profile_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -21,7 +25,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body:
           _selectedIndex == 0
               ? const HomeView()
-              : const Center(child: Text('Halaman Laporan')),
+              : const ReportView(),
 
       // Floating Action Button (Tombol Scan / +) di tengah
       floatingActionButton: FloatingActionButton(
@@ -127,6 +131,9 @@ class HomeView extends ConsumerWidget {
     // Membaca data secara real-time dari Riverpod
     final transactionsAsync = ref.watch(transactionsStreamProvider);
     final totalSpending = ref.watch(monthlyTotalProvider);
+    final user = Supabase.instance.client.auth.currentUser;
+    final username = user?.userMetadata?['username'] ?? 'User';
+    final avatarUrl = user?.userMetadata?['avatar_url'];
 
     return SingleChildScrollView(
       child: Column(
@@ -150,17 +157,24 @@ class HomeView extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(
-                          radius: 24,
-                          backgroundColor: AppColors.primary,
-                          child: Icon(Icons.person, color: Colors.white),
-                        ),
+                    GestureDetector(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                      ),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundColor: AppColors.primary,
+                        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                        child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
+                      ),
+                    ),
                         const SizedBox(width: 16),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Good Morning, Ahmad',
+                            Text(
+                              'Haloo $username',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -180,8 +194,9 @@ class HomeView extends ConsumerWidget {
                     ),
                     IconButton(
                       icon: const Icon(Icons.logout, color: AppColors.darkText),
-                      onPressed: () {
-                        // Tambahkan logika logout ke auth repository
+                      onPressed: () async {
+                        await ref.read(authRepositoryProvider).signOut();
+                        if (context.mounted) context.go('/login');
                       },
                     ),
                   ],

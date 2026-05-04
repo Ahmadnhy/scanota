@@ -1,47 +1,33 @@
+import 'dart:convert';
 import 'dart:typed_data';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import '../../../core/constants/env_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GeminiRepository {
-  late final GenerativeModel _model;
-
-  GeminiRepository() {
-    _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: EnvConfig.geminiApiKey,
-      generationConfig: GenerationConfig(
-        responseMimeType: 'application/json',
-      ),
-    );
-  }
+  final _supabase = Supabase.instance.client;
 
   Future<String> analyzeReceipt(Uint8List imageBytes) async {
-    final prompt = '''
-      Kamu adalah sistem OCR keuangan ahli. Analisis gambar struk ini dan ekstrak informasinya.
-      Kembalikan HANYA format JSON dengan struktur persis seperti ini:
-      {
-        "tanggal": "YYYY-MM-DD",
-        "nama_merchant": "Nama Toko/Merchant",
-        "total_pengeluaran": 50000,
-        "kategori": "makanan/transportasi/belanja/tagihan/kesehatan/hiburan/lainnya"
+    try {
+      // Encode image to Base64
+      final base64Image = base64Encode(imageBytes);
+
+      // Call Supabase Edge Function
+      final response = await _supabase.functions.invoke(
+        'analyze-receipt',
+        body: {'imageBase64': base64Image},
+      );
+
+      if (response.data == null) {
+        throw Exception("Gagal mengekstrak data dari struk (Edge Function returned null).");
       }
-      Jika tanggal tidak terlihat, tebak dari konteks atau kosongkan.
-      Pastikan total_pengeluaran adalah angka (integer/float) tanpa simbol mata uang.
-    ''';
 
-    final content = [
-      Content.multi([
-        TextPart(prompt),
-        DataPart('image/jpeg', imageBytes),
-      ])
-    ];
-
-    final response = await _model.generateContent(content);
-
-    if (response.text == null) {
-      throw Exception("Gagal mengekstrak data dari struk.");
+      // Pastikan output adalah string (jika function mengembalikan JSON object, convert ke string)
+      if (response.data is Map || response.data is List) {
+        return jsonEncode(response.data);
+      }
+      
+      return response.data.toString();
+    } catch (e) {
+      throw Exception("Gagal memproses struk via Edge Function: $e");
     }
-
-    return response.text!;
   }
 }
