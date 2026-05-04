@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
+import '../../../core/network/router.dart';
 import '../data/gemini_repository.dart';
 import '../domain/receipt_data.dart';
 
@@ -41,6 +41,10 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
             initAspectRatio: CropAspectRatioPreset.original,
             lockAspectRatio: false,
           ),
+          WebUiSettings(
+            context: _ref.read(navigatorKeyProvider).currentContext!,
+            presentStyle: WebPresentStyle.page,
+          ),
         ],
       );
 
@@ -49,13 +53,13 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
         return;
       }
 
-      final bytes = await File(croppedFile.path).readAsBytes();
+      final bytes = await croppedFile.readAsBytes();
 
       final geminiRepo = _ref.read(geminiRepoProvider);
       final jsonString = await geminiRepo.analyzeReceipt(bytes);
 
       final Map<String, dynamic> jsonData = jsonDecode(jsonString);
-      final receiptData = ReceiptData.fromJson(jsonData, croppedFile.path);
+      final receiptData = ReceiptData.fromJson(jsonData, croppedFile.path, imageBytes: bytes);
 
       _ref.read(scannedReceiptProvider.notifier).state = receiptData;
 

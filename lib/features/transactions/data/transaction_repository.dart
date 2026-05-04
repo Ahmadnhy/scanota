@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/transaction_model.dart';
@@ -38,7 +38,8 @@ class TransactionRepository {
     required String merchantName,
     required double amount,
     required String category,
-    required File imageFile,
+    required Uint8List imageBytes,
+    required String imageExtension,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception('User belum login!');
@@ -46,13 +47,12 @@ class TransactionRepository {
     String? imageUrl;
 
     try {
-      final fileExtension = imageFile.path.split('.').last;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
       final filePath = '${user.id}/$fileName';
 
-      await _supabase.storage.from('receipts').upload(
+      await _supabase.storage.from('receipts').uploadBinary(
             filePath,
-            imageFile,
+            imageBytes,
             fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
           );
 

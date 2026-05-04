@@ -1,7 +1,8 @@
-import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/app_colors.dart';
 import 'scanner_provider.dart';
 import '../../transactions/data/transaction_repository.dart';
 
@@ -58,26 +59,38 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
 
       final repo = ref.read(transactionRepoProvider);
 
+      final bytes = receiptData.imageBytes ?? await XFile(receiptData.imagePath).readAsBytes();
+      final extension = receiptData.imagePath.split('.').last.split('?').first;
+
       await repo.insertTransaction(
         date: _dateController.text,
         merchantName: _merchantController.text,
         amount: double.parse(_amountController.text),
         category: _selectedCategory,
-        imageFile: File(receiptData.imagePath),
+        imageBytes: bytes,
+        imageExtension: extension,
       );
 
       ref.read(scannedReceiptProvider.notifier).state = null;
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaksi & Struk berhasil disimpan!'), backgroundColor: Colors.green),
+          SnackBar(
+            content: const Text('Transaction saved successfully!'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to save: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -91,91 +104,169 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Validasi Data Struk'),
-        backgroundColor: Colors.teal,
-        foregroundColor: Colors.white,
+        title: const Text('Verify Data', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (receiptData?.imagePath != null)
-                      Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            File(receiptData!.imagePath),
-                            height: 200,
-                            fit: BoxFit.cover,
+      extendBodyBehindAppBar: true,
+      body: Container(
+        decoration: BoxDecoration(gradient: AppColors.headerGradient),
+        child: SafeArea(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Receipt Image Preview Card
+                        if (receiptData?.imagePath != null)
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                                  child: receiptData?.imageBytes != null
+                                      ? Image.memory(
+                                          receiptData!.imageBytes!,
+                                          height: 250,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Image.network(
+                                          receiptData!.imagePath,
+                                          height: 250,
+                                          width: double.infinity,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => Container(
+                                            height: 250,
+                                            color: Colors.grey.shade100,
+                                            child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                          ),
+                                        ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'AI Processed Receipt',
+                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 32),
+
+                        _buildSectionTitle('Transaction Details'),
+                        const SizedBox(height: 16),
+
+                        _buildFieldLabel('Date'),
+                        TextFormField(
+                          controller: _dateController,
+                          decoration: const InputDecoration(
+                            hintText: 'YYYY-MM-DD',
+                            prefixIcon: Icon(Icons.calendar_today_rounded, size: 20),
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Date is required' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        _buildFieldLabel('Merchant Name'),
+                        TextFormField(
+                          controller: _merchantController,
+                          decoration: const InputDecoration(
+                            hintText: 'e.g. Starbucks, Indomaret',
+                            prefixIcon: Icon(Icons.store_rounded, size: 20),
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Merchant name is required' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        _buildFieldLabel('Total Amount'),
+                        TextFormField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            hintText: '0.00',
+                            prefixIcon: Icon(Icons.payments_rounded, size: 20),
+                            prefixText: 'Rp ',
+                          ),
+                          validator: (v) => v!.isEmpty ? 'Amount is required' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        _buildFieldLabel('Category'),
+                        DropdownButtonFormField<String>(
+                          value: _selectedCategory,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.category_rounded, size: 20),
+                          ),
+                          items: _categories.map((c) {
+                            return DropdownMenuItem(value: c, child: Text(c.toUpperCase(), style: const TextStyle(fontSize: 14)));
+                          }).toList(),
+                          onChanged: (v) => setState(() => _selectedCategory = v!),
+                        ),
+
+                        const SizedBox(height: 48),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _saveToDatabase,
+                            child: const Text('Save Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 24),
-                    TextFormField(
-                      controller: _dateController,
-                      decoration: const InputDecoration(
-                        labelText: 'Tanggal (YYYY-MM-DD)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.calendar_today),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Tanggal harus diisi' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _merchantController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nama Merchant/Toko',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.store),
-                      ),
-                      validator: (v) => v!.isEmpty ? 'Nama merchant harus diisi' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _amountController,
-                      decoration: const InputDecoration(
-                        labelText: 'Total Harga',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.attach_money),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (v) => v!.isEmpty ? 'Total harga harus diisi' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Kategori',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.category),
-                      ),
-                      items: _categories.map((c) {
-                        return DropdownMenuItem(value: c, child: Text(c.toUpperCase()));
-                      }).toList(),
-                      onChanged: (v) => setState(() => _selectedCategory = v!),
-                    ),
-                    const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _saveToDatabase,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.teal,
-                          foregroundColor: Colors.white,
+                        const SizedBox(height: 20),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => context.pop(),
+                            child: const Text('Discard', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                          ),
                         ),
-                        child: const Text('Simpan ke Database', style: TextStyle(fontSize: 16)),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.darkText),
+    );
+  }
+
+  Widget _buildFieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(
+        label,
+        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText.withValues(alpha: 0.7), fontSize: 13),
+      ),
     );
   }
 }

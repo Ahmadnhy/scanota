@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -7,8 +8,12 @@ import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/scanner/presentation/scanner_screen.dart';
 import '../../features/scanner/presentation/validation_screen.dart';
 
+final navigatorKeyProvider = Provider((ref) => GlobalKey<NavigatorState>());
+
 final routerProvider = Provider<GoRouter>((ref) {
+  final navigatorKey = ref.watch(navigatorKeyProvider);
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/',
     routes: [
       GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
