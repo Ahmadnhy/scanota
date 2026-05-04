@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
+import '../../../core/constants/app_colors.dart';
 import '../../../core/network/router.dart';
 import '../data/gemini_repository.dart';
 import '../domain/receipt_data.dart';
@@ -31,19 +32,26 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
         return;
       }
 
+      final context = _ref.read(navigatorKeyProvider).currentContext!;
       final CroppedFile? croppedFile = await ImageCropper().cropImage(
         sourcePath: image.path,
         uiSettings: [
           AndroidUiSettings(
-            toolbarTitle: 'Potong Struk',
-            toolbarColor: Colors.teal,
+            toolbarTitle: 'Crop Receipt',
+            toolbarColor: AppColors.primary,
             toolbarWidgetColor: Colors.white,
             initAspectRatio: CropAspectRatioPreset.original,
             lockAspectRatio: false,
+            activeControlsWidgetColor: AppColors.primary,
+          ),
+          IOSUiSettings(
+            title: 'Crop Receipt',
+            aspectRatioLockEnabled: false,
+            resetAspectRatioEnabled: true,
           ),
           WebUiSettings(
-            context: _ref.read(navigatorKeyProvider).currentContext!,
-            presentStyle: WebPresentStyle.page,
+            context: context,
+            presentStyle: WebPresentStyle.dialog,
           ),
         ],
       );

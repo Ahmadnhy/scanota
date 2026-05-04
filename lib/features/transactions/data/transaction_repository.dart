@@ -80,6 +80,11 @@ class TransactionRepository {
       'receipt_image_url': imageUrl,
     });
   }
+
+  // Hapus transaksi
+  Future<void> deleteTransaction(String id) async {
+    await _supabase.from('transactions').delete().eq('id', id);
+  }
 }
 
 // Providers
@@ -89,13 +94,76 @@ final transactionsStreamProvider = StreamProvider<List<TransactionModel>>((ref) 
   return ref.watch(transactionRepoProvider).watchRecentTransactions();
 });
 
-final monthlyTotalProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+// Helper function to calculate sum from a list of maps
+double _calculateTotal(List<Map<String, dynamic>> data, bool Function(DateTime) filter) {
+  return data.where((map) {
+    final date = DateTime.parse(map['transaction_date']);
+    return filter(date);
+  }).fold<double>(0.0, (prev, element) => prev + (double.tryParse(element['total_amount'].toString()) ?? 0.0));
+}
+
+final monthlyTotalProvider = StreamProvider<double>((ref) {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
   final now = DateTime.now();
 
-  return transactions
-      .where((t) => t.date.month == now.month && t.date.year == now.year)
-      .fold(0.0, (sum, item) => sum + item.amount);
+  return supabase
+      .from('transactions')
+      .stream(primaryKey: ['id'])
+      .eq('user_id', userId ?? '')
+      .map((data) => _calculateTotal(data, (date) => date.year == now.year && date.month == now.month));
+});
+
+final todayTotalProvider = StreamProvider<double>((ref) {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+  final now = DateTime.now();
+
+  return supabase
+      .from('transactions')
+      .stream(primaryKey: ['id'])
+      .eq('user_id', userId ?? '')
+      .map((data) => _calculateTotal(data, (date) => 
+          date.year == now.year && date.month == now.month && date.day == now.day));
+});
+
+final yesterdayTotalProvider = StreamProvider<double>((ref) {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+  final yesterday = DateTime.now().subtract(const Duration(days: 1));
+
+  return supabase
+      .from('transactions')
+      .stream(primaryKey: ['id'])
+      .eq('user_id', userId ?? '')
+      .map((data) => _calculateTotal(data, (date) => 
+          date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day));
+});
+
+final weeklyTotalProvider = StreamProvider<double>((ref) {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+  final now = DateTime.now();
+  final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+
+  return supabase
+      .from('transactions')
+      .stream(primaryKey: ['id'])
+      .eq('user_id', userId ?? '')
+      .map((data) => _calculateTotal(data, (date) => date.isAfter(startOfWeek.subtract(const Duration(seconds: 1)))));
+});
+
+final lastMonthTotalProvider = StreamProvider<double>((ref) {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+  final now = DateTime.now();
+  final lastMonth = DateTime(now.year, now.month - 1, 1);
+
+  return supabase
+      .from('transactions')
+      .stream(primaryKey: ['id'])
+      .eq('user_id', userId ?? '')
+      .map((data) => _calculateTotal(data, (date) => date.year == lastMonth.year && date.month == lastMonth.month));
 });
 
 final filterDateProvider = StateProvider<DateTime>((ref) => DateTime.now());

@@ -1,10 +1,9 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/constants/app_colors.dart';
-
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -16,7 +15,8 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _nameController = TextEditingController();
   bool _isLoading = false;
-  File? _imageFile;
+  XFile? _imageFile;
+  Uint8List? _imageBytes;
   final _picker = ImagePicker();
   final _supabase = Supabase.instance.client;
 
@@ -30,7 +30,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null) {
-      setState(() => _imageFile = File(pickedFile.path));
+      final bytes = await pickedFile.readAsBytes();
+      setState(() {
+        _imageFile = pickedFile;
+        _imageBytes = bytes;
+      });
     }
   }
 
@@ -42,14 +46,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
       String? avatarUrl = user.userMetadata?['avatar_url'];
 
-      if (_imageFile != null) {
+      if (_imageBytes != null) {
         final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
         
-        await _supabase.storage.from('avatars').upload(
+        await _supabase.storage.from('avatars').uploadBinary(
           fileName,
-          _imageFile!,
-          fileOptions: const FileOptions(upsert: true),
+          _imageBytes!,
+          fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'),
         );
         
         avatarUrl = _supabase.storage.from('avatars').getPublicUrl(fileName);
@@ -99,10 +102,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   CircleAvatar(
                     radius: 60,
                     backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                    backgroundImage: _imageFile != null
-                        ? FileImage(_imageFile!)
+                    backgroundImage: _imageBytes != null
+                        ? MemoryImage(_imageBytes!)
                         : (currentAvatarUrl != null ? NetworkImage(currentAvatarUrl) : null) as ImageProvider?,
-                    child: _imageFile == null && currentAvatarUrl == null
+                    child: _imageBytes == null && currentAvatarUrl == null
                         ? const Icon(Icons.person, size: 60, color: AppColors.primary)
                         : null,
                   ),
