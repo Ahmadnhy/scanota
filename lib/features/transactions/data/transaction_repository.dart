@@ -50,10 +50,20 @@ class TransactionRepository {
       final fileName = '${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
       final filePath = '${user.id}/$fileName';
 
+      // Tentukan Content-Type berdasarkan ekstensi agar Supabase tidak menolak file (Error 415)
+      String contentType = 'image/jpeg'; // default
+      if (imageExtension.toLowerCase() == 'png') contentType = 'image/png';
+      if (imageExtension.toLowerCase() == 'webp') contentType = 'image/webp';
+      if (imageExtension.toLowerCase() == 'gif') contentType = 'image/gif';
+
       await _supabase.storage.from('receipts').uploadBinary(
             filePath,
             imageBytes,
-            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+            fileOptions: FileOptions(
+              cacheControl: '3600',
+              upsert: false,
+              contentType: contentType,
+            ),
           );
 
       imageUrl = _supabase.storage.from('receipts').getPublicUrl(filePath);

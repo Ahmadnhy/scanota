@@ -150,10 +150,13 @@ class HomeView extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        const CircleAvatar(
+                        CircleAvatar(
                           radius: 24,
                           backgroundColor: AppColors.primary,
-                          child: Icon(Icons.person, color: Colors.white),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Image.asset('assets/images/logo.png'),
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Column(

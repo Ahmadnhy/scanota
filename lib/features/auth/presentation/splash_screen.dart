@@ -19,20 +19,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _handleNavigation() async {
-    // Tunggu selama 2 detik
-    await Future.delayed(const Duration(seconds: 2));
+    // 1. Jalankan timer 2 detik
+    final timer = Future.delayed(const Duration(seconds: 2));
 
-    // Ambil status auth terbaru
-    final authState = ref.read(authStateProvider);
+    // 2. Tunggu sampai data Auth siap (bisa lebih cepat atau lebih lambat dari 2 detik)
+    try {
+      final authState = await ref.read(authStateProvider.future);
 
-    authState.whenData((state) {
+      // 3. Pastikan timer 2 detik sudah selesai sebelum pindah halaman
+      await timer;
+
       if (!mounted) return;
-      if (state.session != null) {
+
+      // 4. Navigasi berdasarkan session
+      if (authState.session != null) {
         context.go('/dashboard');
       } else {
         context.go('/login');
       }
-    });
+    } catch (e) {
+      // Jika terjadi error auth, pastikan tetap pindah ke login setelah 2 detik
+      await timer;
+      if (mounted) context.go('/login');
+    }
   }
 
   @override
@@ -58,7 +67,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.auto_awesome, size: 60, color: AppColors.primary),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.contain,
+              ),
             ),
             const SizedBox(height: 32),
             const Text(
