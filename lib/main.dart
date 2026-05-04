@@ -34,7 +34,7 @@ class MyApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Expense Snap',
+      title: 'Expense Snap | Ubah Foto Struk Jadi Laporan Keuangan Instan',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

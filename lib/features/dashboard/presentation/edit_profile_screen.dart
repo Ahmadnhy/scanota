@@ -15,7 +15,6 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _nameController = TextEditingController();
   bool _isLoading = false;
-  XFile? _imageFile;
   Uint8List? _imageBytes;
   final _picker = ImagePicker();
   final _supabase = Supabase.instance.client;
@@ -32,7 +31,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
       setState(() {
-        _imageFile = pickedFile;
         _imageBytes = bytes;
       });
     }

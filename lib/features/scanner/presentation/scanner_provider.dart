@@ -32,7 +32,12 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
         return;
       }
 
-      final context = _ref.read(navigatorKeyProvider).currentContext!;
+      final navigatorContext = _ref.read(navigatorKeyProvider).currentContext;
+      if (navigatorContext == null || !navigatorContext.mounted) {
+        state = const AsyncValue.data(null);
+        return;
+      }
+
       final CroppedFile? croppedFile = await ImageCropper().cropImage(
         sourcePath: image.path,
         uiSettings: [
@@ -50,7 +55,7 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
             resetAspectRatioEnabled: true,
           ),
           WebUiSettings(
-            context: context,
+            context: navigatorContext,
             presentStyle: WebPresentStyle.dialog,
           ),
         ],

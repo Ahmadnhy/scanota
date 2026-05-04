@@ -10,7 +10,6 @@ import '../../auth/presentation/auth_provider.dart';
 import '../../scanner/presentation/scanner_provider.dart';
 import 'widgets/report_view.dart';
 import 'edit_profile_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../transactions/domain/transaction_model.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -64,7 +63,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     subtitle: 'Type transaction details yourself',
                     onTap: () {
                       Navigator.pop(context);
-                      // context.push('/manual-entry'); 
                       AppNotification.show(context, 'Manual Entry feature coming soon!', isError: false);
                     },
                   ),
@@ -254,6 +252,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 // Professional Top Notification Alert
 class AppNotification {
   static void show(BuildContext context, String message, {bool isError = false}) {
+    if (!context.mounted) return;
     final overlay = Overlay.of(context);
     final entry = OverlayEntry(
       builder: (context) => Positioned(
@@ -594,7 +593,7 @@ class HomeView extends ConsumerWidget {
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () {
-                    ref.read(transactionRepoProvider).deleteTransaction(t.id!);
+                    ref.read(transactionRepoProvider).deleteTransaction(t.id);
                   },
                   child: Icon(Icons.delete_sweep_outlined, size: 18, color: Colors.red.withValues(alpha: 0.5)),
                 ),

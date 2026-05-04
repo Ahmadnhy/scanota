@@ -35,12 +35,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (authState.session != null) {
         context.go('/dashboard');
       } else {
-        context.go('/login');
+        context.go('/welcome');
       }
     } catch (e) {
-      // Jika terjadi error auth, pastikan tetap pindah ke login setelah 2 detik
+      // Jika terjadi error auth, pastikan tetap pindah ke welcome setelah 2 detik
       await timer;
-      if (mounted) context.go('/login');
+      if (mounted) context.go('/welcome');
     }
   }
 
