@@ -93,23 +93,23 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 32),
                   // Balanced, editorial-style "Let's start" button
                   ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 200, maxWidth: 280),
+                    constraints: const BoxConstraints(minWidth: 160, maxWidth: 220),
                     child: SizedBox(
-                      height: 60,
+                      height: 52,
                       child: ElevatedButton(
                         onPressed: () => context.go('/login'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.darkText,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 0,
                         ),
                         child: const Text(
                           "Let's start",
                           style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
