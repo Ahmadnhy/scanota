@@ -67,12 +67,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ],
               ),
-              child: Image.asset(
-                'assets/images/logo.png',
-                width: 80,
-                height: 80,
-                fit: BoxFit.contain,
-              ),
+              child: const Icon(Icons.auto_awesome, size: 60, color: AppColors.primary),
             ),
             const SizedBox(height: 32),
             const Text(
