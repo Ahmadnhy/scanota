@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:ui';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/app_notification.dart';
 import '../../transactions/data/transaction_repository.dart';
@@ -206,8 +207,42 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           showDialog(
             context: context,
             barrierDismissible: false,
-            barrierColor: Colors.black.withValues(alpha: 0.5),
-            builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            barrierColor: Colors.black.withValues(alpha: 0.2),
+            builder: (context) => BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(32),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 30, spreadRadius: 10),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 40, height: 40,
+                            child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 4),
+                          ),
+                          const SizedBox(height: 24),
+                          const Text('Scanning Receipt...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                          const SizedBox(height: 8),
+                          Text('AI is extracting your transaction data', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
         },
       );
