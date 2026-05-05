@@ -23,14 +23,14 @@ serve(async (req) => {
 
     let result;
     try {
-      // First try with the newer, faster 2.5 model
-      const model25 = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
-      result = await model25.generateContent(parts)
+      // First try with the faster flash model
+      const modelFlash = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" })
+      result = await modelFlash.generateContent(parts)
     } catch (e) {
-      // Fallback to the stable 1.5 model if 2.5 is experiencing high demand (503)
-      console.log("gemini-2.5-flash failed, falling back to gemini-1.5-flash. Error:", e.message)
-      const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
-      result = await model15.generateContent(parts)
+      // Fallback to pro model if flash is experiencing high demand (503) or 404
+      console.log("gemini-1.5-flash-latest failed, falling back to gemini-1.5-pro-latest. Error:", e.message)
+      const modelPro = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" })
+      result = await modelPro.generateContent(parts)
     }
 
     let responseText = result.response.text()
