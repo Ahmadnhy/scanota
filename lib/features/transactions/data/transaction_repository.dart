@@ -38,8 +38,8 @@ class TransactionRepository {
     required String merchantName,
     required double amount,
     required String category,
-    required Uint8List imageBytes,
-    required String imageExtension,
+    Uint8List? imageBytes,
+    String? imageExtension,
   }) async {
     final user = _supabase.auth.currentUser;
     if (user == null) throw Exception('User belum login!');
@@ -47,26 +47,28 @@ class TransactionRepository {
     String? imageUrl;
 
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
-      final filePath = '${user.id}/$fileName';
+      if (imageBytes != null && imageExtension != null && imageExtension.isNotEmpty) {
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
+        final filePath = '${user.id}/$fileName';
 
-      // Tentukan Content-Type berdasarkan ekstensi agar Supabase tidak menolak file (Error 415)
-      String contentType = 'image/jpeg'; // default
-      if (imageExtension.toLowerCase() == 'png') contentType = 'image/png';
-      if (imageExtension.toLowerCase() == 'webp') contentType = 'image/webp';
-      if (imageExtension.toLowerCase() == 'gif') contentType = 'image/gif';
+        // Tentukan Content-Type berdasarkan ekstensi agar Supabase tidak menolak file (Error 415)
+        String contentType = 'image/jpeg'; // default
+        if (imageExtension.toLowerCase() == 'png') contentType = 'image/png';
+        if (imageExtension.toLowerCase() == 'webp') contentType = 'image/webp';
+        if (imageExtension.toLowerCase() == 'gif') contentType = 'image/gif';
 
-      await _supabase.storage.from('receipts').uploadBinary(
-            filePath,
-            imageBytes,
-            fileOptions: FileOptions(
-              cacheControl: '3600',
-              upsert: false,
-              contentType: contentType,
-            ),
-          );
+        await _supabase.storage.from('receipts').uploadBinary(
+              filePath,
+              imageBytes,
+              fileOptions: FileOptions(
+                cacheControl: '3600',
+                upsert: false,
+                contentType: contentType,
+              ),
+            );
 
-      imageUrl = _supabase.storage.from('receipts').getPublicUrl(filePath);
+        imageUrl = _supabase.storage.from('receipts').getPublicUrl(filePath);
+      }
     } catch (e) {
       throw Exception('Gagal mengupload gambar struk: $e');
     }

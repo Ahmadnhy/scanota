@@ -67,7 +67,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.auto_awesome, size: 60, color: AppColors.primary),
+              child: Image.asset(
+                'assets/images/expensnap-icon.png',
+                width: 80,
+                height: 80,
+              ),
             ),
             const SizedBox(height: 32),
             const Text(

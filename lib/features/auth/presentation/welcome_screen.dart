@@ -58,10 +58,10 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.auto_awesome,
-                      size: 40,
-                      color: AppColors.primary,
+                    child: Image.asset(
+                      'assets/images/expensnap-icon.png',
+                      width: 48,
+                      height: 48,
                     ),
                   ),
                   const SizedBox(height: 40),

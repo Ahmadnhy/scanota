@@ -8,6 +8,7 @@ import '../../features/auth/presentation/welcome_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/scanner/presentation/scanner_screen.dart';
 import '../../features/scanner/presentation/validation_screen.dart';
+import '../../features/transactions/presentation/manual_entry_screen.dart';
 
 final navigatorKeyProvider = Provider((ref) => GlobalKey<NavigatorState>());
 
@@ -24,6 +25,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/dashboard', builder: (context, state) => const DashboardScreen()),
       GoRoute(path: '/scanner', builder: (context, state) => const ScannerScreen()),
       GoRoute(path: '/validation', builder: (context, state) => const ValidationScreen()),
+      GoRoute(path: '/manual-entry', builder: (context, state) => const ManualEntryScreen()),
     ],
   );
 });

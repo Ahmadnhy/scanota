@@ -63,7 +63,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     subtitle: 'Type transaction details yourself',
                     onTap: () {
                       Navigator.pop(context);
-                      AppNotification.show(context, 'Manual Entry feature coming soon!', isError: false);
+                      context.push('/manual-entry');
                     },
                   ),
                 ],
@@ -121,7 +121,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       }),
                       _buildSquareOption(Icons.file_present_rounded, 'Files', () {
                         Navigator.pop(context);
-                        AppNotification.show(context, 'File picker coming soon!', isError: false);
+                        ref.read(scannerControllerProvider.notifier).processReceiptFromFile();
                       }),
                     ],
                   ),
@@ -190,13 +190,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<void>>(scannerControllerProvider, (previous, next) {
+      if (previous is AsyncLoading && next is! AsyncLoading) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      next.when(
+        data: (_) {
+          if (previous is AsyncLoading && ref.read(scannedReceiptProvider) != null) {
+            context.push('/validation');
+          }
+        },
+        error: (e, _) => AppNotification.show(context, 'Error processing receipt', isError: true),
+        loading: () {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            barrierColor: Colors.black.withValues(alpha: 0.5),
+            builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          );
+        },
+      );
+    });
+
     return Theme(
       data: Theme.of(context).copyWith(
         textTheme: GoogleFonts.outfitTextTheme(Theme.of(context).textTheme),
       ),
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: _selectedIndex == 0 ? const HomeView() : const ReportView(),
+        body: _selectedIndex == 0 ? HomeView(onDetailPressed: () => setState(() => _selectedIndex = 1)) : const ReportView(),
         floatingActionButton: FloatingActionButton(
           onPressed: _showTransactionMenu,
           backgroundColor: AppColors.primary,
@@ -234,11 +256,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: isSelected ? AppColors.primary : Colors.grey.shade400),
+          Icon(icon, color: isSelected ? Colors.black : Colors.grey.shade400),
           Text(
             label,
             style: TextStyle(
-              color: isSelected ? AppColors.primary : Colors.grey.shade400,
+              color: isSelected ? Colors.black : Colors.grey.shade400,
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
@@ -323,7 +345,8 @@ class _NotificationWidgetState extends State<_NotificationWidget> with SingleTic
 
 // ... Rest of the HomeView class from previous turns ...
 class HomeView extends ConsumerWidget {
-  const HomeView({super.key});
+  final VoidCallback onDetailPressed;
+  const HomeView({super.key, required this.onDetailPressed});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -336,16 +359,11 @@ class HomeView extends ConsumerWidget {
     final username = user?.userMetadata?['username'] ?? 'User';
     final avatarUrl = user?.userMetadata?['avatar_url'];
 
-    final todayTotal = ref.watch(todayTotalProvider).value ?? 0.0;
-    final yesterdayTotal = ref.watch(yesterdayTotalProvider).value ?? 0.0;
-    final weeklyTotal = ref.watch(weeklyTotalProvider).value ?? 0.0;
-    final lastMonthTotal = ref.watch(lastMonthTotalProvider).value ?? 0.0;
-
     return SingleChildScrollView(
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 40),
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 20, left: 24, right: 24, bottom: 40),
             decoration: BoxDecoration(gradient: AppColors.headerGradient),
             child: Column(
               children: [
@@ -356,7 +374,6 @@ class HomeView extends ConsumerWidget {
             ),
           ),
           Container(
-            transform: Matrix4.translationValues(0, -20, 0),
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
@@ -367,9 +384,7 @@ class HomeView extends ConsumerWidget {
               children: [
                 _buildBalanceAndIncomeCards(monthlyTotal),
                 const SizedBox(height: 32),
-                _buildSummarySection(todayTotal, yesterdayTotal, weeklyTotal, monthlyTotal, lastMonthTotal),
-                const SizedBox(height: 32),
-                _buildTransactionList(transactionsAsync, ref, todayTotal),
+                _buildTransactionSections(transactionsAsync, ref),
                 const SizedBox(height: 80),
               ],
             ),
@@ -398,7 +413,7 @@ class HomeView extends ConsumerWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Haloo $username', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.darkText)),
+                Text('Haloo, $username', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.darkText)),
                 Text('Manage your finances today.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
             ),
@@ -406,9 +421,33 @@ class HomeView extends ConsumerWidget {
         ),
         IconButton(
           icon: const Icon(Icons.logout, color: AppColors.darkText),
-          onPressed: () async {
-            await ref.read(authRepositoryProvider).signOut();
-            if (context.mounted) context.go('/login');
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                title: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+                content: const Text('Are you sure you want to log out?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await ref.read(authRepositoryProvider).signOut();
+                      if (context.mounted) context.go('/login');
+                    },
+                    child: const Text('Logout', style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            );
           },
         ),
       ],
@@ -466,8 +505,12 @@ class HomeView extends ConsumerWidget {
               ],
             ),
             GestureDetector(
-              onTap: () {},
-              child: Text('Detail >', style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+              onTap: onDetailPressed,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20)),
+                child: const Text('Detail >', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),
@@ -499,65 +542,71 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummarySection(double today, double yesterday, double weekly, double monthly, double lastMonth) {
+  Widget _buildTransactionSections(AsyncValue<List<TransactionModel>> transactionsAsync, WidgetRef ref) {
+    return transactionsAsync.when(
+      data: (data) {
+        final now = DateTime.now();
+        final yesterday = now.subtract(const Duration(days: 1));
+        
+        final todayData = data.where((t) => t.date.year == now.year && t.date.month == now.month && t.date.day == now.day).toList();
+        final yesterdayData = data.where((t) => t.date.year == yesterday.year && t.date.month == yesterday.month && t.date.day == yesterday.day).toList();
+        
+        final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+        final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+        
+        final weekData = data.where((t) {
+          final tDate = DateTime(t.date.year, t.date.month, t.date.day);
+          return (tDate.isAtSameMomentAs(startOfWeekDate) || tDate.isAfter(startOfWeekDate)) &&
+                 !todayData.contains(t) && !yesterdayData.contains(t);
+        }).toList();
+        
+        final monthData = data.where((t) {
+          return t.date.year == now.year && t.date.month == now.month &&
+                 !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t);
+        }).toList();
+
+        if (data.isEmpty) {
+          return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Belum ada transaksi.')));
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSection('TODAY', todayData, ref),
+            if (todayData.isNotEmpty) const SizedBox(height: 24),
+            _buildSection('YESTERDAY', yesterdayData, ref),
+            if (yesterdayData.isNotEmpty) const SizedBox(height: 24),
+            _buildSection('THIS WEEK', weekData, ref),
+            if (weekData.isNotEmpty) const SizedBox(height: 24),
+            _buildSection('THIS MONTH', monthData, ref),
+          ],
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text("Error: $e")),
+    );
+  }
+
+  Widget _buildSection(String title, List<TransactionModel> items, WidgetRef ref) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    final total = items.fold(0.0, (sum, item) => sum + item.amount);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('SUMMARY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
-        const SizedBox(height: 16),
-        _buildSummaryRow('Today', today, isHighlight: true),
-        _buildSummaryRow('Yesterday', yesterday),
-        _buildSummaryRow('This Week', weekly),
-        _buildSummaryRow('This Month', monthly),
-        _buildSummaryRow('Last Month', lastMonth),
-      ],
-    );
-  }
-
-  Widget _buildSummaryRow(String label, double amount, {bool isHighlight = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: isHighlight ? AppColors.darkText : Colors.grey.shade600, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
-          Text('-Rp ${NumberFormat("#,###", "id_ID").format(amount)}', style: TextStyle(color: isHighlight ? Colors.redAccent : AppColors.darkText, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTransactionList(AsyncValue<List<TransactionModel>> transactionsAsync, WidgetRef ref, double todayTotal) {
-    return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('TODAY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
-            Text('Total -Rp ${NumberFormat("#,###", "id_ID").format(todayTotal)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
+            Text('Total -Rp ${NumberFormat("#,###", "id_ID").format(total)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
           ],
         ),
         const SizedBox(height: 16),
-        transactionsAsync.when(
-          data: (data) {
-            final todayData = data.where((TransactionModel t) {
-              final now = DateTime.now();
-              return t.date.year == now.year && t.date.month == now.month && t.date.day == now.day;
-            }).toList();
-
-            if (todayData.isEmpty) {
-              return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Belum ada pengeluaran hari ini.')));
-            }
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: todayData.length,
-              separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 32),
-              itemBuilder: (context, index) => _buildTransactionItem(todayData[index], ref),
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text("Error: $e")),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 32),
+          itemBuilder: (context, index) => _buildTransactionItem(items[index], ref),
         ),
       ],
     );
@@ -617,21 +666,38 @@ class HomeView extends ConsumerWidget {
   Widget _buildBalanceCard({required IconData icon, required String title, required String amount, required Color iconColor, required String info}) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(24)),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, offset: const Offset(0, 8)),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: iconColor),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [iconColor.withValues(alpha: 0.2), iconColor.withValues(alpha: 0.05)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: iconColor),
+              ),
               _buildInfoIcon(info),
             ],
           ),
           const SizedBox(height: 16),
           Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
           const SizedBox(height: 4),
-          Text(amount, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkText)),
+          Text(amount, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.darkText)),
         ],
       ),
     );

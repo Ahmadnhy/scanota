@@ -15,14 +15,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
   void _login() async {
     setState(() => _isLoading = true);
     try {
-      await ref.read(authRepositoryProvider).signIn(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
+      await ref
+          .read(authRepositoryProvider)
+          .signIn(
+            _emailController.text.trim(),
+            _passwordController.text.trim(),
+          );
       if (!mounted) return;
       context.go('/dashboard');
     } catch (e) {
@@ -32,7 +35,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           content: Text(e.toString()),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
     } finally {
@@ -56,7 +61,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 32),
                   const Text(
                     'Welcome Back!',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.darkText, letterSpacing: -1),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.darkText,
+                      letterSpacing: -1,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -64,60 +74,99 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 48),
-                  
+
                   // Form
                   Text(
                     'Email Address',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText.withValues(alpha: 0.8), fontSize: 14),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
-                      hintText: 'name@example.com',
+                      hintText: ' Enter Your Email Address',
                       prefixIcon: Icon(Icons.email_outlined, size: 20),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   Text(
                     'Password',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText.withValues(alpha: 0.8), fontSize: 14),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_isPasswordVisible,
+                    decoration: InputDecoration(
                       hintText: 'Enter your password',
-                      prefixIcon: Icon(Icons.lock_outline, size: 20),
+                      prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          size: 20,
+                          color: Colors.grey.shade600,
+                        ),
+                        onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
-                  
+
                   // Login Button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _login,
-                      child: _isLoading
-                          ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Sign In', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text(
+                                'Sign In',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Footer
                   Center(
                     child: TextButton(
                       onPressed: () => context.push('/register'),
                       child: RichText(
                         text: TextSpan(
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
                           children: const [
                             TextSpan(text: "Don't have an account? "),
-                            TextSpan(text: 'Sign Up', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                            TextSpan(
+                              text: 'Sign Up',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ),

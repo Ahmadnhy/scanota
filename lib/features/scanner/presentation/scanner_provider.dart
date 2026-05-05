@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/network/router.dart';
+
 import '../data/gemini_repository.dart';
 import '../domain/receipt_data.dart';
 
@@ -32,47 +30,48 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
         return;
       }
 
-      final navigatorContext = _ref.read(navigatorKeyProvider).currentContext;
-      if (navigatorContext == null || !navigatorContext.mounted) {
-        state = const AsyncValue.data(null);
-        return;
-      }
-
-      final CroppedFile? croppedFile = await ImageCropper().cropImage(
-        sourcePath: image.path,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Crop Receipt',
-            toolbarColor: AppColors.primary,
-            toolbarWidgetColor: Colors.white,
-            initAspectRatio: CropAspectRatioPreset.original,
-            lockAspectRatio: false,
-            activeControlsWidgetColor: AppColors.primary,
-          ),
-          IOSUiSettings(
-            title: 'Crop Receipt',
-            aspectRatioLockEnabled: false,
-            resetAspectRatioEnabled: true,
-          ),
-          WebUiSettings(
-            context: navigatorContext,
-            presentStyle: WebPresentStyle.dialog,
-          ),
-        ],
-      );
-
-      if (croppedFile == null) {
-        state = const AsyncValue.data(null);
-        return;
-      }
-
-      final bytes = await croppedFile.readAsBytes();
+      final bytes = await image.readAsBytes();
 
       final geminiRepo = _ref.read(geminiRepoProvider);
       final jsonString = await geminiRepo.analyzeReceipt(bytes);
 
       final Map<String, dynamic> jsonData = jsonDecode(jsonString);
-      final receiptData = ReceiptData.fromJson(jsonData, croppedFile.path, imageBytes: bytes);
+      final receiptData = ReceiptData.fromJson(jsonData, image.path, imageBytes: bytes);
+
+      _ref.read(scannedReceiptProvider.notifier).state = receiptData;
+
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> processReceiptFromFile() async {
+    try {
+      state = const AsyncValue.loading();
+
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        state = const AsyncValue.data(null);
+        return;
+      }
+
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) {
+        throw Exception("Failed to read file bytes");
+      }
+
+      final geminiRepo = _ref.read(geminiRepoProvider);
+      final jsonString = await geminiRepo.analyzeReceipt(bytes);
+
+      final Map<String, dynamic> jsonData = jsonDecode(jsonString);
+      final receiptData = ReceiptData.fromJson(jsonData, file.path ?? 'file_${DateTime.now().millisecondsSinceEpoch}', imageBytes: bytes);
 
       _ref.read(scannedReceiptProvider.notifier).state = receiptData;
 

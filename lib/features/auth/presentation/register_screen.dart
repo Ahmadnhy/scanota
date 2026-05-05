@@ -15,11 +15,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
 
   void _register() async {
     setState(() => _isLoading = true);
     try {
-      await ref.read(authRepositoryProvider).signUp(
+      await ref
+          .read(authRepositoryProvider)
+          .signUp(
             _emailController.text.trim(),
             _passwordController.text.trim(),
             _nameController.text.trim(),
@@ -68,7 +71,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 children: [
                   const Text(
                     'Join Expense Snap',
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.darkText, letterSpacing: -1),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.darkText,
+                      letterSpacing: -1,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -80,13 +88,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   // Form
                   Text(
                     'Full Name',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText.withValues(alpha: 0.8), fontSize: 14),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _nameController,
                     decoration: const InputDecoration(
-                      hintText: 'Ahmad Mahfuz',
+                      hintText: 'Your Full Name',
                       prefixIcon: Icon(Icons.person_outline, size: 20),
                     ),
                   ),
@@ -94,13 +106,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   Text(
                     'Email Address',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText.withValues(alpha: 0.8), fontSize: 14),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _emailController,
                     decoration: const InputDecoration(
-                      hintText: 'name@example.com',
+                      hintText: 'Your Email Address',
                       prefixIcon: Icon(Icons.email_outlined, size: 20),
                     ),
                   ),
@@ -108,15 +124,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   Text(
                     'Password',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkText.withValues(alpha: 0.8), fontSize: 14),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText.withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
+                    obscureText: !_isPasswordVisible,
+                    decoration: InputDecoration(
                       hintText: 'Create a strong password',
-                      prefixIcon: Icon(Icons.lock_outline, size: 20),
+                      prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          size: 20,
+                          color: Colors.grey.shade600,
+                        ),
+                        onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -127,9 +155,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _register,
-                      child: _isLoading
-                          ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Sign Up', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text(
+                                'Sign Up',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -140,10 +182,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onPressed: () => Navigator.of(context).pop(),
                       child: RichText(
                         text: TextSpan(
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 14,
+                          ),
                           children: const [
                             TextSpan(text: "Already have an account? "),
-                            TextSpan(text: 'Log In', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                            TextSpan(
+                              text: 'Log In',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                       ),

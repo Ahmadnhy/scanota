@@ -22,6 +22,11 @@ class _ReportViewState extends ConsumerState<ReportView> {
   @override
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final todayTotal = ref.watch(todayTotalProvider).value ?? 0.0;
+    final yesterdayTotal = ref.watch(yesterdayTotalProvider).value ?? 0.0;
+    final weeklyTotal = ref.watch(weeklyTotalProvider).value ?? 0.0;
+    final monthlyTotal = ref.watch(monthlyTotalProvider).value ?? 0.0;
+    final lastMonthTotal = ref.watch(lastMonthTotalProvider).value ?? 0.0;
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -53,6 +58,27 @@ class _ReportViewState extends ConsumerState<ReportView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.headerGradient,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Total Expenses', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
+                        const SizedBox(height: 8),
+                        Text('Rp ${NumberFormat("#,###", "id_ID").format(filteredData.fold(0.0, (sum, item) => sum + item.amount))}', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  _buildSummarySection(todayTotal, yesterdayTotal, weeklyTotal, monthlyTotal, lastMonthTotal),
+                  const SizedBox(height: 32),
+
                   // Search Bar
                   TextField(
                     onChanged: (value) => setState(() => _searchQuery = value),
@@ -81,7 +107,7 @@ class _ReportViewState extends ConsumerState<ReportView> {
                             label: Text(cat[0].toUpperCase() + cat.substring(1)),
                             selected: isSelected,
                             onSelected: (selected) => setState(() => _selectedCategory = cat),
-                            selectedColor: AppColors.primary,
+                            selectedColor: Colors.black,
                             labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.darkText, fontSize: 12),
                             showCheckmark: false,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -224,5 +250,33 @@ class _ReportViewState extends ConsumerState<ReportView> {
       case 'tagihan': return Icons.receipt_long;
       default: return Icons.account_balance_wallet;
     }
+  }
+
+  Widget _buildSummarySection(double today, double yesterday, double weekly, double monthly, double lastMonth) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('SUMMARY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
+        const SizedBox(height: 16),
+        _buildSummaryRow('Today', today, isHighlight: true),
+        _buildSummaryRow('Yesterday', yesterday),
+        _buildSummaryRow('This Week', weekly),
+        _buildSummaryRow('This Month', monthly),
+        _buildSummaryRow('Last Month', lastMonth),
+      ],
+    );
+  }
+
+  Widget _buildSummaryRow(String label, double amount, {bool isHighlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: isHighlight ? AppColors.darkText : Colors.grey.shade600, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
+          Text('-Rp ${NumberFormat("#,###", "id_ID").format(amount)}', style: TextStyle(color: isHighlight ? Colors.redAccent : AppColors.darkText, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
+        ],
+      ),
+    );
   }
 }

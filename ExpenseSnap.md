@@ -24,7 +24,7 @@ Saya ingin membuat project aplikasi berbasis flutter untuk scan struk nota yang 
 
 4. Visualisasi & UI Tools (Package Pendukung Flutter)
 
-- Kamera & Gambar: image_picker (untuk ambil foto/galeri) dan image_cropper (untuk merapikan potongan struk sebelum dikirim ke Gemini).
+- Kamera & Gambar: image_picker (untuk ambil foto/galeri).
 - Grafik Laporan: fl_chart untuk membuat grafik pie chart (kategori pengeluaran) atau bar chart (pengeluaran harian/mingguan/bulanan).
 - Export Laporan (Opsional): Package pdf atau excel jika ke depannya ingin ada fitur cetak laporan tahunan.
 
@@ -119,7 +119,7 @@ lib/
 │ ├── scanner/ # Fitur Kamera & OCR Gemini (Inti Aplikasi)
 │ │ ├── data/ # Repository pemanggil API Gemini & Storage
 │ │ ├── domain/ # Model struktur JSON dari Gemini
-│ │ └── presentation/ # UI Kamera, provider image cropper, provider Gemini state
+│ │ └── presentation/ # UI Kamera, provider Gemini state
 │ │
 │ ├── transactions/ # Fitur CRUD & Daftar Pengeluaran
 │ │ ├── data/ # Repository operasi CRUD ke Supabase DB
@@ -152,7 +152,7 @@ lib/
 
 3. Flow Scanner & Entry (Floating Action Button di tengah Bottom Nav)
    Camera Screen: Halaman penuh membuka kamera untuk memfoto struk (dilengkapi grid/guidelines). Juga menyediakan tombol untuk mengambil gambar dari Gallery.
-   Crop & Edit Screen: Halaman preview setelah memfoto, memberi kesempatan user memotong bagian yang tidak penting sebelum gambar dikirim ke Gemini.
+
    Validation / Form Entry Screen: \* Halaman menampilkan loading state (animasi memproses OCR).
    Setelah JSON dari Gemini diterima, muncul Form Input yang sudah terisi otomatis (pre-filled): Tanggal, Nama Toko, Kategori, dan Total Harga.
    User memverifikasi dan mengoreksi data tersebut, lalu menekan tombol "Simpan ke Database".
@@ -178,7 +178,7 @@ Kita akan menginstal _package_ utama dan _package_ khusus _development_ (untuk _
 **Package Utama:**
 
 ```bash
-flutter pub add flutter_riverpod riverpod_annotation supabase_flutter google_generative_ai image_picker image_cropper go_router intl
+flutter pub add flutter_riverpod riverpod_annotation supabase_flutter google_generative_ai image_picker go_router intl
 ```
 
 _(Catatan: `intl` ditambahkan untuk memformat angka menjadi Rupiah (Rp) nanti)._
