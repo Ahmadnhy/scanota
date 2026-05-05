@@ -34,8 +34,9 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
 
       final geminiRepo = _ref.read(geminiRepoProvider);
       final jsonString = await geminiRepo.analyzeReceipt(bytes);
+      final cleanedStr = jsonString.replaceAll(RegExp(r'```(?:json)?\n?'), '').replaceAll('```', '').trim();
 
-      final Map<String, dynamic> jsonData = jsonDecode(jsonString);
+      final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
       final receiptData = ReceiptData.fromJson(jsonData, image.path, imageBytes: bytes);
 
       _ref.read(scannedReceiptProvider.notifier).state = receiptData;
@@ -69,8 +70,9 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
 
       final geminiRepo = _ref.read(geminiRepoProvider);
       final jsonString = await geminiRepo.analyzeReceipt(bytes);
+      final cleanedStr = jsonString.replaceAll(RegExp(r'```(?:json)?\n?'), '').replaceAll('```', '').trim();
 
-      final Map<String, dynamic> jsonData = jsonDecode(jsonString);
+      final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
       final receiptData = ReceiptData.fromJson(jsonData, file.path ?? 'file_${DateTime.now().millisecondsSinceEpoch}', imageBytes: bytes);
 
       _ref.read(scannedReceiptProvider.notifier).state = receiptData;

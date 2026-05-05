@@ -4,9 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'dart:ui';
+import 'dart:convert';
 import 'dart:typed_data';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/app_notification.dart';
 import '../data/transaction_repository.dart';
+import '../../scanner/presentation/scanner_provider.dart';
 
 class ManualEntryScreen extends ConsumerStatefulWidget {
   const ManualEntryScreen({super.key});
@@ -22,9 +26,10 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
   final _amountController = TextEditingController();
   String _selectedCategory = 'lainnya';
   bool _isLoading = false;
+  bool _isAnalyzingImage = false;
   XFile? _selectedImage;
 
-  final List<String> _categories = ['makanan', 'transportasi', 'belanja', 'tagihan', 'kesehatan', 'hiburan', 'lainnya'];
+  List<String> _categories = ['makanan', 'transportasi', 'belanja', 'tagihan', 'kesehatan', 'hiburan', 'lainnya'];
 
   @override
   void initState() {
@@ -46,7 +51,38 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
     if (pickedFile != null) {
       setState(() {
         _selectedImage = pickedFile;
+        _isAnalyzingImage = true;
       });
+      
+      try {
+        final geminiRepo = ref.read(geminiRepoProvider);
+        final bytes = await pickedFile.readAsBytes();
+        final jsonString = await geminiRepo.analyzeReceipt(bytes);
+        final cleanedStr = jsonString.replaceAll(RegExp(r'```(?:json)?\n?'), '').replaceAll('```', '').trim();
+        final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
+        
+        setState(() {
+          if (jsonData['tanggal'] != null) _dateController.text = jsonData['tanggal'];
+          if (jsonData['nama_merchant'] != null) _merchantController.text = jsonData['nama_merchant'];
+          if (jsonData['total_pengeluaran'] != null) _amountController.text = jsonData['total_pengeluaran'].toString();
+          if (jsonData['kategori'] != null) {
+            String cat = jsonData['kategori'].toString().toLowerCase();
+            if (!_categories.contains(cat)) {
+              _categories.add(cat);
+            }
+            _selectedCategory = cat;
+          }
+        });
+        if (mounted) {
+          AppNotification.show(context, 'Receipt analyzed successfully!');
+        }
+      } catch (e) {
+        if (mounted) {
+          AppNotification.show(context, 'Failed to scan receipt: $e', isError: true);
+        }
+      } finally {
+        if (mounted) setState(() => _isAnalyzingImage = false);
+      }
     }
   }
 
@@ -74,24 +110,12 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Transaction saved successfully!'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppNotification.show(context, 'Transaction saved successfully!');
         context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save: $e'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppNotification.show(context, 'Failed to save: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -134,12 +158,16 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                                 BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10)),
                               ],
                             ),
-                            child: _selectedImage != null
-                                ? ClipRRect(
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (_selectedImage != null)
+                                  ClipRRect(
                                     borderRadius: BorderRadius.circular(24),
-                                    child: Image.network(_selectedImage!.path, fit: BoxFit.cover, errorBuilder: (c, e, s) => Image.file(File(_selectedImage!.path), fit: BoxFit.cover)),
+                                    child: Image.network(_selectedImage!.path, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c, e, s) => Image.file(File(_selectedImage!.path), width: double.infinity, fit: BoxFit.cover)),
                                   )
-                                : Column(
+                                else
+                                  Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Icon(Icons.add_a_photo_outlined, size: 48, color: AppColors.primary.withValues(alpha: 0.5)),
@@ -147,6 +175,66 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                                       Text('Upload Receipt (Optional)', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
                                     ],
                                   ),
+                                  
+                                if (_isAnalyzingImage)
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: BackdropFilter(
+                                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                      child: Container(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(16),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  shape: BoxShape.circle,
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: AppColors.primary.withValues(alpha: 0.2),
+                                                      blurRadius: 15,
+                                                      spreadRadius: 5,
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const SizedBox(
+                                                  width: 32,
+                                                  height: 32,
+                                                  child: CircularProgressIndicator(
+                                                    color: AppColors.primary,
+                                                    strokeWidth: 3,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              const Text(
+                                                'AI Processing...',
+                                                style: TextStyle(
+                                                  color: AppColors.darkText,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                  letterSpacing: 0.5,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                'Extracting data from receipt',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 32),

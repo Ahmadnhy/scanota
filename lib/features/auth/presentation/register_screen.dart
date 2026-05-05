@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/app_notification.dart';
 import 'auth_provider.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -28,23 +29,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             _nameController.text.trim(),
           );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Registrasi berhasil! Silakan cek email Anda.'),
-          backgroundColor: AppColors.primary,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppNotification.show(context, 'Registrasi berhasil! Silakan cek email Anda.');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppNotification.show(context, 'Registration Failed: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

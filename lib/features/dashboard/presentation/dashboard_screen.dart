@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/app_notification.dart';
 import '../../transactions/data/transaction_repository.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../scanner/presentation/scanner_provider.dart';
@@ -200,7 +201,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             context.push('/validation');
           }
         },
-        error: (e, _) => AppNotification.show(context, 'Error processing receipt', isError: true),
+        error: (e, _) => AppNotification.show(context, e.toString(), isError: true),
         loading: () {
           showDialog(
             context: context,
@@ -271,77 +272,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-// Professional Top Notification Alert
-class AppNotification {
-  static void show(BuildContext context, String message, {bool isError = false}) {
-    if (!context.mounted) return;
-    final overlay = Overlay.of(context);
-    final entry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 50,
-        left: 24,
-        right: 24,
-        child: Material(
-          color: Colors.transparent,
-          child: _NotificationWidget(message: message, isError: isError),
-        ),
-      ),
-    );
-
-    overlay.insert(entry);
-    Future.delayed(const Duration(seconds: 3), () => entry.remove());
-  }
-}
-
-class _NotificationWidget extends StatefulWidget {
-  final String message;
-  final bool isError;
-  const _NotificationWidget({required this.message, required this.isError});
-
-  @override
-  State<_NotificationWidget> createState() => _NotificationWidgetState();
-}
-
-class _NotificationWidgetState extends State<_NotificationWidget> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _offsetAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
-    _offsetAnimation = Tween<Offset>(begin: const Offset(0, -2), end: Offset.zero).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SlideTransition(
-      position: _offsetAnimation,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        decoration: BoxDecoration(
-          color: widget.isError ? Colors.redAccent : AppColors.primary,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 5))],
-        ),
-        child: Row(
-          children: [
-            Icon(widget.isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(widget.message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ... Rest of the HomeView class from previous turns ...
 class HomeView extends ConsumerWidget {
@@ -384,7 +314,7 @@ class HomeView extends ConsumerWidget {
               children: [
                 _buildBalanceAndIncomeCards(monthlyTotal),
                 const SizedBox(height: 32),
-                _buildTransactionSections(transactionsAsync, ref),
+                _buildTransactionSections(transactionsAsync, ref, context),
                 const SizedBox(height: 80),
               ],
             ),
@@ -506,11 +436,7 @@ class HomeView extends ConsumerWidget {
             ),
             GestureDetector(
               onTap: onDetailPressed,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20)),
-                child: const Text('Detail >', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
+              child: const Text('Detail >', style: TextStyle(fontSize: 14, color: AppColors.darkText, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -522,7 +448,7 @@ class HomeView extends ConsumerWidget {
                 icon: Icons.payments_outlined,
                 title: 'Income',
                 amount: 'Rp 0',
-                iconColor: Colors.green,
+                iconColor: AppColors.primary,
                 info: 'Total pemasukan yang Anda catat bulan ini.',
               ),
             ),
@@ -532,7 +458,7 @@ class HomeView extends ConsumerWidget {
                 icon: Icons.account_balance_wallet_outlined,
                 title: 'Expenses',
                 amount: 'Rp ${NumberFormat("#,###", "id_ID").format(totalSpending)}',
-                iconColor: Colors.redAccent,
+                iconColor: AppColors.primary,
                 info: 'Total pengeluaran yang Anda catat bulan ini.',
               ),
             ),
@@ -542,7 +468,7 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  Widget _buildTransactionSections(AsyncValue<List<TransactionModel>> transactionsAsync, WidgetRef ref) {
+  Widget _buildTransactionSections(AsyncValue<List<TransactionModel>> transactionsAsync, WidgetRef ref, BuildContext context) {
     return transactionsAsync.when(
       data: (data) {
         final now = DateTime.now();
@@ -572,13 +498,13 @@ class HomeView extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSection('TODAY', todayData, ref),
-            if (todayData.isNotEmpty) const SizedBox(height: 24),
-            _buildSection('YESTERDAY', yesterdayData, ref),
+            _buildSection('TODAY', todayData, ref, context, showEmpty: true),
             if (yesterdayData.isNotEmpty) const SizedBox(height: 24),
-            _buildSection('THIS WEEK', weekData, ref),
+            _buildSection('YESTERDAY', yesterdayData, ref, context),
             if (weekData.isNotEmpty) const SizedBox(height: 24),
-            _buildSection('THIS MONTH', monthData, ref),
+            _buildSection('THIS WEEK', weekData, ref, context),
+            if (monthData.isNotEmpty) const SizedBox(height: 24),
+            _buildSection('THIS MONTH', monthData, ref, context),
           ],
         );
       },
@@ -587,8 +513,8 @@ class HomeView extends ConsumerWidget {
     );
   }
 
-  Widget _buildSection(String title, List<TransactionModel> items, WidgetRef ref) {
-    if (items.isEmpty) return const SizedBox.shrink();
+  Widget _buildSection(String title, List<TransactionModel> items, WidgetRef ref, BuildContext context, {bool showEmpty = false}) {
+    if (items.isEmpty && !showEmpty) return const SizedBox.shrink();
     final total = items.fold(0.0, (sum, item) => sum + item.amount);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,23 +522,26 @@ class HomeView extends ConsumerWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
-            Text('Total -Rp ${NumberFormat("#,###", "id_ID").format(total)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700, letterSpacing: 1)),
+            Text('Total -Rp ${NumberFormat("#,###", "id_ID").format(total)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
           ],
         ),
         const SizedBox(height: 16),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: items.length,
-          separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 32),
-          itemBuilder: (context, index) => _buildTransactionItem(items[index], ref),
-        ),
+        if (items.isEmpty)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Belum ada transaksi hari ini.', style: TextStyle(color: AppColors.secondaryText)))
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 32),
+            itemBuilder: (context, index) => _buildTransactionItem(items[index], ref, context),
+          ),
       ],
     );
   }
 
-  Widget _buildTransactionItem(TransactionModel t, WidgetRef ref) {
+  Widget _buildTransactionItem(TransactionModel t, WidgetRef ref, BuildContext context) {
     return Row(
       children: [
         Container(
@@ -626,27 +555,52 @@ class HomeView extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(t.merchantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
-              const SizedBox(height: 2),
+              const SizedBox(height: 8),
               _buildPillLabel(t.category.toUpperCase()),
             ],
           ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+        Row(
           children: [
-            Text('-Rp ${NumberFormat("#,###", "id_ID").format(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
-            const SizedBox(height: 4),
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(DateFormat('MMM, d yyyy').format(t.date), style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    ref.read(transactionRepoProvider).deleteTransaction(t.id);
-                  },
-                  child: Icon(Icons.delete_sweep_outlined, size: 18, color: Colors.red.withValues(alpha: 0.5)),
-                ),
+                Text('-Rp ${NumberFormat("#,###", "id_ID").format(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                const SizedBox(height: 4),
+                Text(DateFormat('MMM, d yyyy').format(t.date), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
+            ),
+            const SizedBox(width: 12),
+            GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    title: const Text('Delete Transaction', style: TextStyle(fontWeight: FontWeight.bold)),
+                    content: const Text('Are you sure you want to delete this transaction?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          ref.read(transactionRepoProvider).deleteTransaction(t.id);
+                          Navigator.pop(context);
+                          AppNotification.show(context, 'Transaction deleted');
+                        },
+                        child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: const Icon(Icons.delete_sweep_rounded, size: 28, color: Colors.redAccent),
             ),
           ],
         ),

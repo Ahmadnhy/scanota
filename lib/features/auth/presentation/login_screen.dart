@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/app_notification.dart';
 import 'auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -30,16 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       context.go('/dashboard');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      AppNotification.show(context, 'Login Failed: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

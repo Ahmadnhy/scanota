@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/app_notification.dart';
 import 'scanner_provider.dart';
 import '../../transactions/data/transaction_repository.dart';
 
@@ -21,7 +22,7 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
   String _selectedCategory = 'lainnya';
   bool _isLoading = false;
 
-  final List<String> _categories = [
+  List<String> _categories = [
     'makanan',
     'transportasi',
     'belanja',
@@ -38,7 +39,15 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
     _dateController = TextEditingController(text: receiptData?.date ?? '');
     _merchantController = TextEditingController(text: receiptData?.merchantName ?? '');
     _amountController = TextEditingController(text: receiptData?.totalAmount.toString() ?? '');
-    _selectedCategory = receiptData?.category ?? 'lainnya';
+    if (receiptData != null && receiptData.category.isNotEmpty) {
+      String cat = receiptData.category.toLowerCase();
+      if (!_categories.contains(cat)) {
+        _categories.add(cat);
+      }
+      _selectedCategory = cat;
+    } else {
+      _selectedCategory = 'lainnya';
+    }
   }
 
   @override
@@ -74,24 +83,12 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
       ref.read(scannedReceiptProvider.notifier).state = null;
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Transaction saved successfully!'),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppNotification.show(context, 'Transaction saved successfully!');
         context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save: $e'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppNotification.show(context, 'Failed to save: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
