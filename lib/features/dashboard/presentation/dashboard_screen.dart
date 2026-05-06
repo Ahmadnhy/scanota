@@ -315,8 +315,11 @@ class HomeView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final transactionsAsync = ref.watch(transactionsProvider);
     final monthlyTotal = ref.watch(monthlyTotalProvider);
+    
+    // Aktifkan realtime listener untuk auto-refresh dari perangkat lain
+    ref.watch(realtimeTransactionListenerProvider);
     
     final authState = ref.watch(authStateProvider);
     final user = authState.value?.session?.user;
@@ -419,7 +422,7 @@ class HomeView extends ConsumerWidget {
   }
 
   Widget _buildBalanceDisplay(double totalSpending, WidgetRef ref) {
-    final transactionsAsync = ref.watch(transactionsStreamProvider);
+    final transactionsAsync = ref.watch(transactionsProvider);
     return Column(
       children: [
         Text('Current Balance', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
@@ -623,10 +626,13 @@ class HomeView extends ConsumerWidget {
                           backgroundColor: Colors.black,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: () {
-                          ref.read(transactionRepoProvider).deleteTransaction(t.id);
-                          Navigator.pop(context);
-                          AppNotification.show(context, 'Transaction deleted');
+                        onPressed: () async {
+                          await ref.read(transactionRepoProvider).deleteTransaction(t.id);
+                          ref.invalidate(transactionsProvider);
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            AppNotification.show(context, 'Transaction deleted');
+                          }
                         },
                         child: const Text('Delete', style: TextStyle(color: Colors.white)),
                       ),

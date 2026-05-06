@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,22 +7,23 @@ import '../domain/transaction_model.dart';
 class TransactionRepository {
   final _supabase = Supabase.instance.client;
 
-  // Mengambil semua transaksi user via stream (untuk dashboard & report)
-  Stream<List<TransactionModel>> watchTransactions() {
+  // Mengambil semua transaksi user via SELECT query (reliable, tidak bergantung Realtime)
+  Future<List<TransactionModel>> getTransactions() async {
     final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
     // Kita ambil data dari awal bulan lalu untuk mencakup semua statistik di dashboard
     final now = DateTime.now();
     final startRange = DateTime(now.year, now.month - 1, 1).toIso8601String();
 
-    return _supabase
+    final data = await _supabase
         .from('transactions')
-        .stream(primaryKey: ['id'])
-        .eq('user_id', userId ?? '')
-        .order('transaction_date', ascending: false)
-        .map((data) => data
-            .map((map) => TransactionModel.fromMap(map))
-            .where((t) => t.date.isAfter(DateTime.parse(startRange).subtract(const Duration(seconds: 1))))
-            .toList());
+        .select()
+        .eq('user_id', userId)
+        .gte('transaction_date', startRange)
+        .order('transaction_date', ascending: false);
+
+    return data.map((map) => TransactionModel.fromMap(map)).toList();
   }
 
   // Insert transaksi baru dengan upload gambar
@@ -83,17 +85,56 @@ class TransactionRepository {
 // Providers
 final transactionRepoProvider = Provider((ref) => TransactionRepository());
 
-// Single Source of Truth for Transactions
-// Using autoDispose + keepAlive so it can be invalidated to force re-subscribe
-final transactionsStreamProvider = StreamProvider.autoDispose<List<TransactionModel>>((ref) {
-  // Keep the stream alive as long as there are listeners
+// ============================================================================
+// SINGLE SOURCE OF TRUTH — FutureProvider berbasis SELECT query
+// Lebih reliable dari StreamProvider karena tidak bergantung pada Supabase
+// Realtime yang harus di-enable di server. Setiap kali di-invalidate,
+// langsung fetch data terbaru dari database.
+// ============================================================================
+final transactionsProvider = FutureProvider.autoDispose<List<TransactionModel>>((ref) async {
+  // Keep alive agar tidak di-dispose saat tidak ada listener sementara
   ref.keepAlive();
-  return ref.watch(transactionRepoProvider).watchTransactions();
+  return ref.watch(transactionRepoProvider).getTransactions();
 });
 
-// Derived Providers (Synchronous calculations from the stream)
+// ============================================================================
+// REALTIME LISTENER — Optional, auto-refresh jika Realtime aktif di Supabase
+// Jika Realtime tidak di-enable di tabel, listener ini tidak akan
+// menerima event, tapi app tetap berjalan normal karena pakai FutureProvider.
+// ============================================================================
+final realtimeTransactionListenerProvider = Provider<void>((ref) {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) return;
+
+  final channel = supabase.channel('transactions_realtime');
+  channel
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'transactions',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'user_id',
+          value: userId,
+        ),
+        callback: (payload) {
+          // Setiap ada INSERT/UPDATE/DELETE dari perangkat lain,
+          // invalidate provider agar UI langsung refresh
+          ref.invalidate(transactionsProvider);
+        },
+      )
+      .subscribe();
+
+  // Cleanup: unsubscribe channel saat provider di-dispose
+  ref.onDispose(() {
+    supabase.removeChannel(channel);
+  });
+});
+
+// Derived Providers (Synchronous calculations from the fetched data)
 final monthlyTotalProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(transactionsProvider).value ?? [];
   final now = DateTime.now();
   return transactions
       .where((t) => t.date.year == now.year && t.date.month == now.month)
@@ -101,7 +142,7 @@ final monthlyTotalProvider = Provider<double>((ref) {
 });
 
 final todayTotalProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(transactionsProvider).value ?? [];
   final now = DateTime.now();
   return transactions
       .where((t) => t.date.year == now.year && t.date.month == now.month && t.date.day == now.day)
@@ -109,7 +150,7 @@ final todayTotalProvider = Provider<double>((ref) {
 });
 
 final yesterdayTotalProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(transactionsProvider).value ?? [];
   final yesterday = DateTime.now().subtract(const Duration(days: 1));
   return transactions
       .where((t) => t.date.year == yesterday.year && t.date.month == yesterday.month && t.date.day == yesterday.day)
@@ -117,7 +158,7 @@ final yesterdayTotalProvider = Provider<double>((ref) {
 });
 
 final weeklyTotalProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(transactionsProvider).value ?? [];
   final now = DateTime.now();
   final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
   final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
@@ -128,7 +169,7 @@ final weeklyTotalProvider = Provider<double>((ref) {
 });
 
 final lastMonthTotalProvider = Provider<double>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(transactionsProvider).value ?? [];
   final now = DateTime.now();
   final lastMonthDate = DateTime(now.year, now.month - 1, 1);
   return transactions
@@ -139,7 +180,7 @@ final lastMonthTotalProvider = Provider<double>((ref) {
 final filterDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 
 final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
-  final transactions = ref.watch(transactionsStreamProvider).value ?? [];
+  final transactions = ref.watch(transactionsProvider).value ?? [];
   final filterDate = ref.watch(filterDateProvider);
 
   return transactions.where((t) {
