@@ -528,6 +528,10 @@ class HomeView extends ConsumerWidget {
                  !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t);
         }).toList();
 
+        final olderData = data.where((t) {
+          return !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t) && !monthData.contains(t);
+        }).toList();
+
         if (data.isEmpty) {
           return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Belum ada transaksi.')));
         }
@@ -542,6 +546,8 @@ class HomeView extends ConsumerWidget {
             _buildSection('THIS WEEK', weekData, ref, context),
             if (monthData.isNotEmpty) const SizedBox(height: 24),
             _buildSection('THIS MONTH', monthData, ref, context),
+            if (olderData.isNotEmpty) const SizedBox(height: 24),
+            _buildSection('OLDER', olderData, ref, context),
           ],
         );
       },

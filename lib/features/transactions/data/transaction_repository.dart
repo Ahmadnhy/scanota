@@ -22,16 +22,13 @@ class TransactionRepository {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return [];
 
-    // Kita ambil data dari awal bulan lalu untuk mencakup semua statistik di dashboard
-    final now = DateTime.now();
-    final startRange = DateTime(now.year, now.month - 1, 1).toIso8601String();
-
+    // Mengambil transaksi terbaru tanpa batasan tanggal agar struk lama yang di-scan tetap muncul
     final data = await _supabase
         .from('transactions')
         .select()
         .eq('user_id', userId)
-        .gte('transaction_date', startRange)
-        .order('transaction_date', ascending: false);
+        .order('transaction_date', ascending: false)
+        .limit(100); // Batasi 100 transaksi terakhir agar performa tetap terjaga
 
     return data.map((map) => TransactionModel.fromMap(map)).toList();
   }
