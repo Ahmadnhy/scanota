@@ -4,6 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../domain/transaction_model.dart';
 
+/// Safely extract a clean image extension, defaulting to 'jpg' if parsing fails.
+String _safeExtension(String? rawExtension) {
+  if (rawExtension == null || rawExtension.isEmpty) return 'jpg';
+  // Strip query params and take only alphanumeric chars
+  final cleaned = rawExtension.split('?').first.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+  const validExts = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'};
+  if (validExts.contains(cleaned)) return cleaned;
+  return 'jpg';
+}
+
 class TransactionRepository {
   final _supabase = Supabase.instance.client;
 
@@ -40,15 +50,17 @@ class TransactionRepository {
 
     String? imageUrl;
 
-    try {
-      if (imageBytes != null && imageExtension != null && imageExtension.isNotEmpty) {
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}.$imageExtension';
+    // Try uploading the image, but DON'T let upload failure block the transaction insert.
+    if (imageBytes != null) {
+      try {
+        final ext = _safeExtension(imageExtension);
+        final fileName = '${DateTime.now().millisecondsSinceEpoch}.$ext';
         final filePath = '${user.id}/$fileName';
 
         String contentType = 'image/jpeg';
-        if (imageExtension.toLowerCase() == 'png') contentType = 'image/png';
-        if (imageExtension.toLowerCase() == 'webp') contentType = 'image/webp';
-        if (imageExtension.toLowerCase() == 'gif') contentType = 'image/gif';
+        if (ext == 'png') contentType = 'image/png';
+        if (ext == 'webp') contentType = 'image/webp';
+        if (ext == 'gif') contentType = 'image/gif';
 
         await _supabase.storage.from('receipts').uploadBinary(
               filePath,
@@ -61,9 +73,10 @@ class TransactionRepository {
             );
 
         imageUrl = _supabase.storage.from('receipts').getPublicUrl(filePath);
+      } catch (e) {
+        // Log but don't throw — the transaction should still be saved.
+        debugPrint('[TransactionRepo] Image upload failed (will save without image): $e');
       }
-    } catch (e) {
-      throw Exception('Gagal mengupload gambar struk: $e');
     }
 
     await _supabase.from('transactions').insert({

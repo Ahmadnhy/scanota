@@ -1,4 +1,3 @@
-import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -68,8 +67,24 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
 
       final repo = ref.read(transactionRepoProvider);
 
-      final bytes = receiptData.imageBytes ?? await XFile(receiptData.imagePath).readAsBytes();
-      final extension = receiptData.imagePath.split('.').last.split('?').first;
+      // Safely get image bytes — use already-loaded bytes from ReceiptData.
+      // Do NOT try XFile(imagePath) as a fallback — on web the path is often a
+      // blob: URL that cannot be re-opened.
+      final bytes = receiptData.imageBytes;
+
+      // Safely extract extension with a fallback
+      String? extension;
+      if (bytes != null) {
+        final path = receiptData.imagePath;
+        final lastDot = path.lastIndexOf('.');
+        if (lastDot != -1 && lastDot < path.length - 1) {
+          extension = path.substring(lastDot + 1).split('?').first.split('/').first;
+        }
+        // If extension still looks invalid, fallback to jpg
+        if (extension == null || extension.isEmpty || extension.length > 5) {
+          extension = 'jpg';
+        }
+      }
 
       await repo.insertTransaction(
         date: _dateController.text,

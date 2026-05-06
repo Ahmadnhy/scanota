@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'dart:io';
 import 'dart:ui';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -97,7 +96,15 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
       String? extension;
       if (_selectedImage != null) {
         bytes = await _selectedImage!.readAsBytes();
-        extension = _selectedImage!.path.split('.').last;
+        // Safely extract extension — on web, XFile.path can be a blob: URL
+        final path = _selectedImage!.path;
+        final lastDot = path.lastIndexOf('.');
+        if (lastDot != -1 && lastDot < path.length - 1) {
+          extension = path.substring(lastDot + 1).split('?').first.split('/').first;
+        }
+        if (extension == null || extension.isEmpty || extension.length > 5) {
+          extension = 'jpg'; // safe fallback
+        }
       }
 
       await repo.insertTransaction(
@@ -167,7 +174,15 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                                 if (_selectedImage != null)
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(24),
-                                    child: Image.network(_selectedImage!.path, width: double.infinity, fit: BoxFit.cover, errorBuilder: (c, e, s) => Image.file(File(_selectedImage!.path), width: double.infinity, fit: BoxFit.cover)),
+                                    child: FutureBuilder<Uint8List>(
+                                      future: _selectedImage!.readAsBytes(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData) {
+                                          return Image.memory(snapshot.data!, width: double.infinity, height: 200, fit: BoxFit.cover);
+                                        }
+                                        return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+                                      },
+                                    ),
                                   )
                                 else
                                   Column(
