@@ -109,6 +109,9 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
         imageExtension: extension,
       );
 
+      // Force refresh the transactions stream so dashboard updates immediately
+      ref.invalidate(transactionsStreamProvider);
+
       if (mounted) {
         AppNotification.show(context, 'Transaction saved successfully!');
         context.go('/dashboard');

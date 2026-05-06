@@ -84,7 +84,10 @@ class TransactionRepository {
 final transactionRepoProvider = Provider((ref) => TransactionRepository());
 
 // Single Source of Truth for Transactions
-final transactionsStreamProvider = StreamProvider<List<TransactionModel>>((ref) {
+// Using autoDispose + keepAlive so it can be invalidated to force re-subscribe
+final transactionsStreamProvider = StreamProvider.autoDispose<List<TransactionModel>>((ref) {
+  // Keep the stream alive as long as there are listeners
+  ref.keepAlive();
   return ref.watch(transactionRepoProvider).watchTransactions();
 });
 

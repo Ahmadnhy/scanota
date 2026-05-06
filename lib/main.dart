@@ -12,10 +12,13 @@ void main() async {
   // Load file .env pertama kali
   await dotenv.load(fileName: ".env");
 
-  // Inisialisasi Supabase menggunakan EnvConfig
+  // Inisialisasi Supabase menggunakan EnvConfig dengan Realtime diaktifkan
   await Supabase.initialize(
     url: EnvConfig.supabaseUrl,
     anonKey: EnvConfig.supabaseAnonKey,
+    realtimeClientOptions: const RealtimeClientOptions(
+      eventsPerSecond: 2,
+    ),
   );
 
   // Bungkus aplikasi dengan ProviderScope agar Riverpod bisa berjalan

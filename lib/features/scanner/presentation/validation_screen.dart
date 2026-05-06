@@ -82,6 +82,9 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
 
       ref.read(scannedReceiptProvider.notifier).state = null;
 
+      // Force refresh the transactions stream so dashboard updates immediately
+      ref.invalidate(transactionsStreamProvider);
+
       if (mounted) {
         AppNotification.show(context, 'Transaction saved successfully!');
         context.go('/dashboard');
