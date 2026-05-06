@@ -59,7 +59,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Join Expense Snap',
+                    'Join Scanota',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,

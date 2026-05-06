@@ -16,17 +16,11 @@ void main() async {
   await Supabase.initialize(
     url: EnvConfig.supabaseUrl,
     anonKey: EnvConfig.supabaseAnonKey,
-    realtimeClientOptions: const RealtimeClientOptions(
-      eventsPerSecond: 2,
-    ),
+    realtimeClientOptions: const RealtimeClientOptions(eventsPerSecond: 2),
   );
 
   // Bungkus aplikasi dengan ProviderScope agar Riverpod bisa berjalan
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends ConsumerWidget {
@@ -37,7 +31,7 @@ class MyApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Expense Snap | Ubah Foto Struk Jadi Laporan Keuangan Instan',
+      title: 'Scanota | Ubah Foto Struk Nota Jadi Laporan Keuangan Instan',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -47,7 +41,10 @@ class MyApp extends ConsumerWidget {
           primary: AppColors.primary,
         ),
         textTheme: const TextTheme(
-          headlineMedium: TextStyle(color: AppColors.darkText, fontWeight: FontWeight.bold),
+          headlineMedium: TextStyle(
+            color: AppColors.darkText,
+            fontWeight: FontWeight.bold,
+          ),
           bodyLarge: TextStyle(color: AppColors.darkText),
           bodyMedium: TextStyle(color: AppColors.darkText),
         ),
@@ -66,14 +63,19 @@ class MyApp extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primary, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
         ),

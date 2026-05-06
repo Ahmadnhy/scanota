@@ -46,7 +46,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -75,8 +74,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             ),
             const SizedBox(height: 32),
             const Text(
-              'Expense Snap',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.darkText, letterSpacing: -1),
+              'Scanota',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: AppColors.darkText,
+                letterSpacing: -1,
+              ),
             ),
             const SizedBox(height: 12),
             const SizedBox(

@@ -1,6 +1,6 @@
 {
-    "name": "expensesnap",
-    "short_name": "expensesnap",
+    "name": "Scanota",
+    "short_name": "Scanota",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",

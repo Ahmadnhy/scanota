@@ -60,7 +60,7 @@ class WelcomeScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: const Text(
-                      'Expense Snap is a smart AI app for scanning receipts (OCR) and automatically managing your daily and annual expenses. Start managing your finances!',
+                      'Scanota is a smart AI app for scanning receipts (OCR) and automatically managing your daily and annual expenses. Start managing your finances!',
                       textAlign: TextAlign.justify,
                       style: TextStyle(
                         fontSize: 16,

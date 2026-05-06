@@ -1,4 +1,4 @@
-name: expensesnap
+name: scanota
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -64,10 +64,10 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/expensnap-icon.png"
+  image_path: "assets/images/scanota-icon.png"
   web:
     generate: true
-    image_path: "assets/images/expensnap-icon.png"
+    image_path: "assets/images/scanota-icon.png"
     background_color: "#ffffff"
     theme_color: "#ffffff"
 
@@ -85,7 +85,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - .env
-    - assets/images/expensnap-icon.png
+    - assets/images/scanota-icon.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
