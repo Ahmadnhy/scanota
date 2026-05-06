@@ -139,55 +139,62 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
                       children: [
                         // Receipt Image Preview Card
                         if (receiptData?.imagePath != null)
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                                  child: receiptData?.imageBytes != null
-                                      ? Image.memory(
-                                          receiptData!.imageBytes!,
-                                          height: 250,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                        )
-                                      : Image.network(
-                                          receiptData!.imagePath,
-                                          height: 250,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) => Container(
-                                            height: 250,
-                                            color: Colors.grey.shade100,
-                                            child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
-                                          ),
-                                        ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 18),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'AI Processed Receipt',
-                                        style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600),
-                                      ),
-                                    ],
+                          Center(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    constraints: const BoxConstraints(maxHeight: 250),
+                                    child: AspectRatio(
+                                      aspectRatio: 1,
+                                      child: ClipRRect(
+                                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                                        child: receiptData?.imageBytes != null
+                                            ? Image.memory(
+                                                receiptData!.imageBytes!,
+                                                width: double.infinity,
+                                                fit: BoxFit.contain,
+                                              )
+                                            : Image.network(
+                                                receiptData!.imagePath,
+                                                width: double.infinity,
+                                                fit: BoxFit.contain,
+                                                errorBuilder: (context, error, stackTrace) => Container(
+                                                  color: Colors.grey.shade100,
+                                                  child: const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.verified_user_rounded, color: AppColors.primary, size: 18),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'AI Processed Receipt',
+                                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         const SizedBox(height: 32),
@@ -249,14 +256,28 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
                           height: 56,
                           child: ElevatedButton(
                             onPressed: _saveToDatabase,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
                             child: const Text('Save Transaction', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        Center(
-                          child: TextButton(
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton(
                             onPressed: () => context.pop(),
-                            child: const Text('Discard', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.redAccent,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              side: const BorderSide(color: Colors.redAccent, width: 1),
+                              elevation: 0,
+                            ),
+                            child: const Text('Discard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
                         ),
                       ],

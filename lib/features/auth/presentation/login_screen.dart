@@ -119,6 +119,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _login,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                      ),
                       child:
                           _isLoading
                               ? const SizedBox(
@@ -151,11 +155,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             fontSize: 14,
                           ),
                           children: const [
-                            TextSpan(text: "Don't have an account? "),
+                            TextSpan(
+                              text: "Don't have an account? ",
+                              style: TextStyle(color: Colors.black),
+                            ),
                             TextSpan(
                               text: 'Sign Up',
                               style: TextStyle(
-                                color: AppColors.primary,
+                                color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

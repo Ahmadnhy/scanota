@@ -19,14 +19,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _handleNavigation() async {
-    // 1. Jalankan timer 2 detik
-    final timer = Future.delayed(const Duration(seconds: 2));
+    // 1. Jalankan timer 4 detik
+    final timer = Future.delayed(const Duration(seconds: 4));
 
     // 2. Tunggu sampai data Auth siap (bisa lebih cepat atau lebih lambat dari 2 detik)
     try {
       final authState = await ref.read(authStateProvider.future);
 
-      // 3. Pastikan timer 2 detik sudah selesai sebelum pindah halaman
+      // 3. Pastikan timer 4 detik sudah selesai sebelum pindah halaman
       await timer;
 
       if (!mounted) return;
@@ -38,7 +38,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         context.go('/welcome');
       }
     } catch (e) {
-      // Jika terjadi error auth, pastikan tetap pindah ke welcome setelah 2 detik
+      // Jika terjadi error auth, pastikan tetap pindah ke welcome setelah 4 detik
       await timer;
       if (mounted) context.go('/welcome');
     }
@@ -67,10 +67,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   ),
                 ],
               ),
-              child: Image.asset(
-                'assets/images/expensnap-icon.png',
-                width: 80,
-                height: 80,
+              child: const Icon(
+                Icons.stars_rounded,
+                size: 80,
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 32),

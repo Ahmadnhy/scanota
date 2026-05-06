@@ -8,9 +8,10 @@ import 'dart:ui';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/app_notification.dart';
 import '../../transactions/data/transaction_repository.dart';
+import './widgets/report_view.dart';
+import './widgets/transaction_detail_sheet.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../scanner/presentation/scanner_provider.dart';
-import 'widgets/report_view.dart';
 import 'edit_profile_screen.dart';
 import '../../transactions/domain/transaction_model.dart';
 
@@ -30,7 +31,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       barrierDismissible: true,
       barrierLabel: 'Menu',
       barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, anim1, anim2) {
         return Align(
           alignment: Alignment.bottomCenter,
@@ -77,8 +78,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       transitionBuilder: (context, anim1, anim2, child) {
         return FadeTransition(
           opacity: anim1,
-          child: ScaleTransition(
-            scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero)
+                .animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
             child: child,
           ),
         );
@@ -92,7 +94,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       barrierDismissible: true,
       barrierLabel: 'ScanOptions',
       barrierColor: Colors.black.withValues(alpha: 0.5),
-      transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, anim1, anim2) {
         return Align(
           alignment: Alignment.bottomCenter,
@@ -102,6 +104,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(32),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10))],
             ),
             child: Material(
               color: Colors.transparent,
@@ -134,7 +137,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         );
       },
       transitionBuilder: (context, anim1, anim2, child) {
-        return FadeTransition(opacity: anim1, child: ScaleTransition(scale: anim1, child: child));
+        return FadeTransition(
+          opacity: anim1,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero)
+                .animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+            child: child,
+          ),
+        );
       },
     );
   }
@@ -391,28 +401,61 @@ class HomeView extends ConsumerWidget {
           onPressed: () {
             showDialog(
               context: context,
-              builder: (context) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                title: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
-                content: const Text('Are you sure you want to log out?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+              builder: (context) => Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 30, spreadRadius: 10)],
                   ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      Navigator.pop(context);
-                      await ref.read(authRepositoryProvider).signOut();
-                      if (context.mounted) context.go('/login');
-                    },
-                    child: const Text('Logout', style: TextStyle(color: Colors.white)),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                        child: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 32),
+                      ),
+                      const SizedBox(height: 24),
+                      const Text('Logout', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkText)),
+                      const SizedBox(height: 8),
+                      Text('Are you sure you want to log out?', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                              child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                elevation: 0,
+                              ),
+                              onPressed: () async {
+                                final router = GoRouter.of(context);
+                                Navigator.pop(context); // Close dialog
+                                await ref.read(authRepositoryProvider).signOut();
+                                router.go('/welcome');
+                              },
+                              child: const Text('Logout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -423,9 +466,11 @@ class HomeView extends ConsumerWidget {
 
   Widget _buildBalanceDisplay(double totalSpending, WidgetRef ref) {
     final transactionsAsync = ref.watch(transactionsProvider);
+    final yearlyTotal = ref.watch(yearlyTotalProvider);
+    
     return Column(
       children: [
-        Text('Current Balance', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+        Text('Current Expenses', style: TextStyle(color: AppColors.darkText.withValues(alpha: 0.8), fontSize: 14, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Text(
           '-Rp ${NumberFormat("#,###", "id_ID").format(totalSpending)}',
@@ -435,21 +480,21 @@ class HomeView extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Colors.white.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 5))],
+            border: Border.all(color: Colors.white),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('+ Rp 0 this month', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+              Text('- Rp ${NumberFormat("#,###", "id_ID").format(yearlyTotal)} this year', style: const TextStyle(color: AppColors.darkText, fontSize: 12, fontWeight: FontWeight.bold)),
               const SizedBox(width: 10),
-              Container(width: 4, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, shape: BoxShape.circle)),
+              Container(width: 4, height: 4, decoration: const BoxDecoration(color: AppColors.darkText, shape: BoxShape.circle)),
               const SizedBox(width: 10),
               transactionsAsync.when(
-                data: (data) => Text('${data.length} Transactions', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                loading: () => const Text('...', style: TextStyle(fontSize: 12)),
-                error: (_, __) => const Text('-', style: TextStyle(fontSize: 12)),
+                data: (data) => Text('${data.length} Transactions', style: const TextStyle(color: AppColors.darkText, fontSize: 12, fontWeight: FontWeight.bold)),
+                loading: () => const Text('...', style: TextStyle(color: AppColors.darkText, fontSize: 12)),
+                error: (_, __) => const Text('-', style: TextStyle(color: AppColors.darkText, fontSize: 12)),
               ),
             ],
           ),
@@ -485,7 +530,7 @@ class HomeView extends ConsumerWidget {
                 icon: Icons.payments_outlined,
                 title: 'Income',
                 amount: 'Rp 0',
-                iconColor: AppColors.primary,
+                iconColor: Colors.green,
                 info: 'Total pemasukan yang Anda catat bulan ini.',
               ),
             ),
@@ -495,7 +540,7 @@ class HomeView extends ConsumerWidget {
                 icon: Icons.account_balance_wallet_outlined,
                 title: 'Expenses',
                 amount: 'Rp ${NumberFormat("#,###", "id_ID").format(totalSpending)}',
-                iconColor: AppColors.primary,
+                iconColor: Colors.redAccent,
                 info: 'Total pengeluaran yang Anda catat bulan ini.',
               ),
             ),
@@ -511,20 +556,20 @@ class HomeView extends ConsumerWidget {
         final now = DateTime.now();
         final yesterday = now.subtract(const Duration(days: 1));
         
-        final todayData = data.where((t) => t.date.year == now.year && t.date.month == now.month && t.date.day == now.day).toList();
-        final yesterdayData = data.where((t) => t.date.year == yesterday.year && t.date.month == yesterday.month && t.date.day == yesterday.day).toList();
+        final todayData = data.where((t) => t.createdAt.year == now.year && t.createdAt.month == now.month && t.createdAt.day == now.day).toList();
+        final yesterdayData = data.where((t) => t.createdAt.year == yesterday.year && t.createdAt.month == yesterday.month && t.createdAt.day == yesterday.day).toList();
         
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
         
         final weekData = data.where((t) {
-          final tDate = DateTime(t.date.year, t.date.month, t.date.day);
+          final tDate = DateTime(t.createdAt.year, t.createdAt.month, t.createdAt.day);
           return (tDate.isAtSameMomentAs(startOfWeekDate) || tDate.isAfter(startOfWeekDate)) &&
                  !todayData.contains(t) && !yesterdayData.contains(t);
         }).toList();
         
         final monthData = data.where((t) {
-          return t.date.year == now.year && t.date.month == now.month &&
+          return t.createdAt.year == now.year && t.createdAt.month == now.month &&
                  !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t);
         }).toList();
 
@@ -533,7 +578,12 @@ class HomeView extends ConsumerWidget {
         }).toList();
 
         if (data.isEmpty) {
-          return const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('Belum ada transaksi.')));
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSection('TODAY', todayData, ref, context, showEmpty: true),
+            ],
+          );
         }
 
         return Column(
@@ -585,26 +635,29 @@ class HomeView extends ConsumerWidget {
   }
 
   Widget _buildTransactionItem(TransactionModel t, WidgetRef ref, BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 50, height: 50,
-          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
-          child: Icon(_getCategoryIcon(t.category), color: AppColors.primary),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.merchantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
-              const SizedBox(height: 8),
-              _buildPillLabel(t.category.toUpperCase()),
-            ],
-          ),
-        ),
-        Row(
+    return InkWell(
+      onTap: () => _showTransactionDetails(context, t, ref),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+        child: Row(
           children: [
+            Container(
+              width: 50, height: 50,
+              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
+              child: Icon(_getCategoryIcon(t.category), color: AppColors.primary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t.merchantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                  const SizedBox(height: 8),
+                  _buildPillLabel(t.category.toUpperCase()),
+                ],
+              ),
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -613,44 +666,20 @@ class HomeView extends ConsumerWidget {
                 Text(DateFormat('MMM, d yyyy').format(t.date), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
               ],
             ),
-            const SizedBox(width: 12),
-            GestureDetector(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                    title: const Text('Delete Transaction', style: TextStyle(fontWeight: FontWeight.bold)),
-                    content: const Text('Are you sure you want to delete this transaction?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-                      ),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.black,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () async {
-                          await ref.read(transactionRepoProvider).deleteTransaction(t.id);
-                          ref.invalidate(transactionsProvider);
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            AppNotification.show(context, 'Transaction deleted');
-                          }
-                        },
-                        child: const Text('Delete', style: TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: const Icon(Icons.delete_sweep_rounded, size: 28, color: Colors.redAccent),
-            ),
           ],
         ),
-      ],
+      ),
+    );
+  }
+
+  void _showTransactionDetails(BuildContext context, TransactionModel t, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return TransactionDetailSheet(transaction: t);
+      },
     );
   }
 
@@ -677,7 +706,6 @@ class HomeView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
@@ -687,10 +715,11 @@ class HomeView extends ConsumerWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: iconColor),
               ),
+              const SizedBox(width: 8),
               _buildInfoIcon(info),
             ],
           ),
@@ -707,7 +736,7 @@ class HomeView extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6)),
-      child: Text(text, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+      child: Text(text, style: const TextStyle(fontSize: 9, color: AppColors.primary, fontWeight: FontWeight.bold)),
     );
   }
 

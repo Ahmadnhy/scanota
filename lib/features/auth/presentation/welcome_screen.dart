@@ -44,26 +44,7 @@ class WelcomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 60),
-                  // App Icon / Logo
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Image.asset(
-                      'assets/images/expensnap-icon.png',
-                      width: 48,
-                      height: 48,
-                    ),
-                  ),
+
                   const SizedBox(height: 40),
                   // Headline
                   const Text(
@@ -93,23 +74,23 @@ class WelcomeScreen extends StatelessWidget {
                   const SizedBox(height: 32),
                   // Balanced, editorial-style "Let's start" button
                   ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 160, maxWidth: 220),
+                    constraints: const BoxConstraints(minWidth: 120, maxWidth: 160),
                     child: SizedBox(
-                      height: 52,
+                      height: 44,
                       child: ElevatedButton(
                         onPressed: () => context.go('/login'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.darkText,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
                         ),
                         child: const Text(
                           "Let's start",
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

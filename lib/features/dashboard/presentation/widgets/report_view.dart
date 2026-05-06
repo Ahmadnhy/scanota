@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../transactions/data/transaction_repository.dart';
 import '../../../transactions/domain/transaction_model.dart';
+import './transaction_detail_sheet.dart';
 
 class ReportView extends ConsumerStatefulWidget {
   const ReportView({super.key});
@@ -42,15 +43,36 @@ class _ReportViewState extends ConsumerState<ReportView> {
         ),
         body: transactionsAsync.when(
           data: (data) {
-            if (data.isEmpty) {
-              return const Center(child: Text('No transactions yet.'));
-            }
-
             // Filtering logic
             final filteredData = data.where((t) {
               final matchesSearch = t.merchantName.toLowerCase().contains(_searchQuery.toLowerCase());
               final matchesCategory = _selectedCategory == 'All' || t.category.toLowerCase() == _selectedCategory.toLowerCase();
               return matchesSearch && matchesCategory;
+            }).toList();
+
+            // Sectioned logic
+            final now = DateTime.now();
+            final yesterday = now.subtract(const Duration(days: 1));
+            
+            final todayData = filteredData.where((t) => t.createdAt.year == now.year && t.createdAt.month == now.month && t.createdAt.day == now.day).toList();
+            final yesterdayData = filteredData.where((t) => t.createdAt.year == yesterday.year && t.createdAt.month == yesterday.month && t.createdAt.day == yesterday.day).toList();
+            
+            final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+            final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+            
+            final weekData = filteredData.where((t) {
+              final tDate = DateTime(t.createdAt.year, t.createdAt.month, t.createdAt.day);
+              return (tDate.isAtSameMomentAs(startOfWeekDate) || tDate.isAfter(startOfWeekDate)) &&
+                     !todayData.contains(t) && !yesterdayData.contains(t);
+            }).toList();
+            
+            final monthData = filteredData.where((t) {
+              return t.createdAt.year == now.year && t.createdAt.month == now.month &&
+                     !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t);
+            }).toList();
+
+            final olderData = filteredData.where((t) {
+              return !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t) && !monthData.contains(t);
             }).toList();
 
             return SingleChildScrollView(
@@ -68,9 +90,9 @@ class _ReportViewState extends ConsumerState<ReportView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total Expenses', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14)),
+                        Text('Total Expenses', style: TextStyle(color: Colors.black.withValues(alpha: 0.8), fontSize: 14)),
                         const SizedBox(height: 8),
-                        Text('Rp ${NumberFormat("#,###", "id_ID").format(filteredData.fold(0.0, (sum, item) => sum + item.amount))}', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                        Text('Rp ${NumberFormat("#,###", "id_ID").format(filteredData.fold(0.0, (sum, item) => sum + item.amount))}', style: const TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -128,19 +150,17 @@ class _ReportViewState extends ConsumerState<ReportView> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Filtered List
-                  Text('TRANSACTIONS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
-                  const SizedBox(height: 16),
-                  if (filteredData.isEmpty)
-                    const Center(child: Padding(padding: EdgeInsets.all(32), child: Text('No results found.')))
-                  else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredData.length,
-                      separatorBuilder: (context, index) => const Divider(height: 32, color: Color(0xFFF1F5F9)),
-                      itemBuilder: (context, index) => _buildTransactionItem(filteredData[index]),
-                    ),
+                  // Sectioned List
+                  _buildSection('TODAY', todayData, showEmpty: true),
+                  const SizedBox(height: 24),
+                  _buildSection('YESTERDAY', yesterdayData, showEmpty: true),
+                  const SizedBox(height: 24),
+                  _buildSection('THIS WEEK', weekData, showEmpty: true),
+                  const SizedBox(height: 24),
+                  _buildSection('THIS MONTH', monthData, showEmpty: true),
+                  const SizedBox(height: 24),
+                  _buildSection('OLDER', olderData, showEmpty: true),
+                  const SizedBox(height: 40),
                 ],
               ),
             );
@@ -183,6 +203,34 @@ class _ReportViewState extends ConsumerState<ReportView> {
     );
   }
 
+  Widget _buildSection(String title, List<TransactionModel> items, {bool showEmpty = false}) {
+    if (items.isEmpty && !showEmpty) return const SizedBox.shrink();
+    final total = items.fold(0.0, (sum, item) => sum + item.amount);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
+            Text('Total -Rp ${NumberFormat("#,###", "id_ID").format(total)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (items.isEmpty)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Belum ada transaksi.', style: TextStyle(color: Colors.grey)))
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 32),
+            itemBuilder: (context, index) => _buildTransactionItem(items[index]),
+          ),
+      ],
+    );
+  }
+
   Widget _buildSmallBarChart(List<TransactionModel> data) {
     return Container(
       height: 180,
@@ -200,25 +248,62 @@ class _ReportViewState extends ConsumerState<ReportView> {
   }
 
   Widget _buildTransactionItem(TransactionModel t) {
-    return Row(
-      children: [
-        Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-          child: Icon(_getCategoryIcon(t.category), color: AppColors.primary, size: 20),
+    return InkWell(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (context) => TransactionDetailSheet(transaction: t),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: Row(
+          children: [
+            Container(
+              width: 50, height: 50,
+              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
+              child: Icon(_getCategoryIcon(t.category), color: AppColors.primary),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t.merchantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                  const SizedBox(height: 8),
+                  _buildPillLabel(t.category.toUpperCase()),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('-Rp ${NumberFormat("#,###", "id_ID").format(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                const SizedBox(height: 4),
+                Text(DateFormat('MMM, d yyyy').format(t.date), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(t.merchantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text(DateFormat('MMM, d yyyy').format(t.date), style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
-            ],
-          ),
-        ),
-        Text('-Rp ${NumberFormat("#,###", "id_ID").format(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildPillLabel(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 0.5),
+      ),
     );
   }
 

@@ -27,7 +27,7 @@ class TransactionRepository {
         .from('transactions')
         .select()
         .eq('user_id', userId)
-        .order('transaction_date', ascending: false)
+        .order('created_at', ascending: false) // Urutkan berdasarkan waktu input
         .limit(100); // Batasi 100 transaksi terakhir agar performa tetap terjaga
 
     return data.map((map) => TransactionModel.fromMap(map)).toList();
@@ -84,6 +84,25 @@ class TransactionRepository {
       'category': category,
       'receipt_image_url': imageUrl,
     });
+  }
+
+  // Update transaksi
+  Future<void> updateTransaction({
+    required String id,
+    required String date,
+    required String merchantName,
+    required double amount,
+    required String category,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception('User belum login!');
+
+    await _supabase.from('transactions').update({
+      'transaction_date': date,
+      'merchant_name': merchantName,
+      'total_amount': amount,
+      'category': category,
+    }).eq('id', id);
   }
 
   // Hapus transaksi
@@ -147,7 +166,15 @@ final monthlyTotalProvider = Provider<double>((ref) {
   final transactions = ref.watch(transactionsProvider).value ?? [];
   final now = DateTime.now();
   return transactions
-      .where((t) => t.date.year == now.year && t.date.month == now.month)
+      .where((t) => t.createdAt.year == now.year && t.createdAt.month == now.month)
+      .fold(0.0, (prev, t) => prev + t.amount);
+});
+
+final yearlyTotalProvider = Provider<double>((ref) {
+  final transactions = ref.watch(transactionsProvider).value ?? [];
+  final now = DateTime.now();
+  return transactions
+      .where((t) => t.createdAt.year == now.year)
       .fold(0.0, (prev, t) => prev + t.amount);
 });
 
@@ -155,7 +182,7 @@ final todayTotalProvider = Provider<double>((ref) {
   final transactions = ref.watch(transactionsProvider).value ?? [];
   final now = DateTime.now();
   return transactions
-      .where((t) => t.date.year == now.year && t.date.month == now.month && t.date.day == now.day)
+      .where((t) => t.createdAt.year == now.year && t.createdAt.month == now.month && t.createdAt.day == now.day)
       .fold(0.0, (prev, t) => prev + t.amount);
 });
 
@@ -163,7 +190,7 @@ final yesterdayTotalProvider = Provider<double>((ref) {
   final transactions = ref.watch(transactionsProvider).value ?? [];
   final yesterday = DateTime.now().subtract(const Duration(days: 1));
   return transactions
-      .where((t) => t.date.year == yesterday.year && t.date.month == yesterday.month && t.date.day == yesterday.day)
+      .where((t) => t.createdAt.year == yesterday.year && t.createdAt.month == yesterday.month && t.createdAt.day == yesterday.day)
       .fold(0.0, (prev, t) => prev + t.amount);
 });
 
@@ -174,7 +201,7 @@ final weeklyTotalProvider = Provider<double>((ref) {
   final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
   
   return transactions
-      .where((t) => t.date.isAfter(startOfWeekDate.subtract(const Duration(seconds: 1))))
+      .where((t) => t.createdAt.isAfter(startOfWeekDate.subtract(const Duration(seconds: 1))))
       .fold(0.0, (prev, t) => prev + t.amount);
 });
 
@@ -183,7 +210,7 @@ final lastMonthTotalProvider = Provider<double>((ref) {
   final now = DateTime.now();
   final lastMonthDate = DateTime(now.year, now.month - 1, 1);
   return transactions
-      .where((t) => t.date.year == lastMonthDate.year && t.date.month == lastMonthDate.month)
+      .where((t) => t.createdAt.year == lastMonthDate.year && t.createdAt.month == lastMonthDate.month)
       .fold(0.0, (prev, t) => prev + t.amount);
 });
 
@@ -194,7 +221,7 @@ final filteredTransactionsProvider = Provider<List<TransactionModel>>((ref) {
   final filterDate = ref.watch(filterDateProvider);
 
   return transactions.where((t) {
-    return t.date.year == filterDate.year && t.date.month == filterDate.month;
+    return t.createdAt.year == filterDate.year && t.createdAt.month == filterDate.month;
   }).toList();
 });
 

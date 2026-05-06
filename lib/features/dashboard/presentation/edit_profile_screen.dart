@@ -139,6 +139,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               height: 56,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _updateProfile,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text('Save Changes', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),

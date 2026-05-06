@@ -144,6 +144,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _register,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                      ),
                       child:
                           _isLoading
                               ? const SizedBox(
@@ -176,11 +180,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             fontSize: 14,
                           ),
                           children: const [
-                            TextSpan(text: "Already have an account? "),
+                            TextSpan(
+                              text: "Already have an account? ",
+                              style: TextStyle(color: Colors.black),
+                            ),
                             TextSpan(
                               text: 'Log In',
                               style: TextStyle(
-                                color: AppColors.primary,
+                                color: Colors.black,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
