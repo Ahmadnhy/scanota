@@ -196,7 +196,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                             onTap: _pickImage,
                             child: Center(
                               child: Container(
-                                constraints: const BoxConstraints(maxHeight: 250),
+                                constraints: const BoxConstraints(maxHeight: 320),
                                 child: AspectRatio(
                                   aspectRatio: 1,
                                   child: Container(

@@ -68,7 +68,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 ],
               ),
               child: const Icon(
-                Icons.stars_rounded,
+                Icons.receipt_long_rounded,
                 size: 80,
                 color: AppColors.primary,
               ),

@@ -42,10 +42,8 @@ class WelcomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 60),
-
-                  const SizedBox(height: 40),
                   // Headline
                   const Text(
                     'Smart Way to\nTrack Expenses',
@@ -97,8 +95,6 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const Spacer(),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),

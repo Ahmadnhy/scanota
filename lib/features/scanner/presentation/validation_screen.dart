@@ -156,7 +156,7 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(
-                                    constraints: const BoxConstraints(maxHeight: 250),
+                                    constraints: const BoxConstraints(maxHeight: 320),
                                     child: AspectRatio(
                                       aspectRatio: 1,
                                       child: ClipRRect(

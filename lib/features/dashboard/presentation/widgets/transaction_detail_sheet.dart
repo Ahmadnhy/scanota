@@ -166,7 +166,11 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
                   if (!_isEditing && widget.transaction.imageUrl != null) ...[
                     Center(
                       child: Container(
-                        constraints: const BoxConstraints(maxHeight: 250),
+                        constraints: const BoxConstraints(maxHeight: 320),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                         child: AspectRatio(
                           aspectRatio: 1,
                           child: ClipRRect(
@@ -176,7 +180,7 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
                               width: double.infinity,
                               fit: BoxFit.contain,
                               errorBuilder: (context, error, stackTrace) => Container(
-                                color: Colors.grey.shade100,
+                                color: Colors.grey.shade200,
                                 child: const Icon(Icons.broken_image, color: Colors.grey, size: 40),
                               ),
                             ),
