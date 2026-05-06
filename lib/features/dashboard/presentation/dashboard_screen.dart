@@ -316,8 +316,7 @@ class HomeView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transactionsAsync = ref.watch(transactionsStreamProvider);
-    final monthlyTotalAsync = ref.watch(monthlyTotalProvider);
-    final monthlyTotal = monthlyTotalAsync.value ?? 0.0;
+    final monthlyTotal = ref.watch(monthlyTotalProvider);
     
     final authState = ref.watch(authStateProvider);
     final user = authState.value?.session?.user;

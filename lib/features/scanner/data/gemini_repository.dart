@@ -3,31 +3,37 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GeminiRepository {
+  // Panggil client Supabase yang sudah diinisialisasi di main.dart
   final _supabase = Supabase.instance.client;
 
   Future<String> analyzeReceipt(Uint8List imageBytes) async {
     try {
-      // Encode image to Base64
-      final base64Image = base64Encode(imageBytes);
+      // 1. Ubah gambar fisik menjadi teks Base64
+      final String base64Image = base64Encode(imageBytes);
 
-      // Call Supabase Edge Function
+      // 2. Tembak fungsi 'analyze-receipt' di server Supabase
       final response = await _supabase.functions.invoke(
         'analyze-receipt',
         body: {'imageBase64': base64Image},
       );
 
-      if (response.data == null) {
-        throw Exception("Gagal mengekstrak data dari struk (Edge Function returned null).");
+      // 3. Tangkap respons JSON dari server
+      if (response.status == 200) {
+        // Karena respons server bisa berupa String atau objek Map, kita pastikan formatnya:
+        if (response.data is String) {
+          return response.data;
+        } else {
+          return jsonEncode(response.data);
+        }
+      } else {
+        throw Exception("Server menolak permintaan: ${response.status}");
       }
-
-      // Pastikan output adalah string (jika function mengembalikan JSON object, convert ke string)
-      if (response.data is Map || response.data is List) {
-        return jsonEncode(response.data);
-      }
-      
-      return response.data.toString();
+    } on FunctionException catch (e) {
+      throw Exception(
+        "Error pada fungsi server: ${e.details ?? e.reasonPhrase}",
+      );
     } catch (e) {
-      throw Exception("Gagal memproses struk via Edge Function: $e");
+      throw Exception("Gagal mengekstrak struk: $e");
     }
   }
 }

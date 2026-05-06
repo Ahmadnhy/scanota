@@ -22,7 +22,7 @@ class _ValidationScreenState extends ConsumerState<ValidationScreen> {
   String _selectedCategory = 'lainnya';
   bool _isLoading = false;
 
-  List<String> _categories = [
+  final List<String> _categories = [
     'makanan',
     'transportasi',
     'belanja',

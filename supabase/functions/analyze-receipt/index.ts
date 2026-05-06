@@ -1,50 +1,64 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0"
+   import { GoogleGenerativeAI, SchemaType } from "npm:@google/generative-ai"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+   // CORS agar aplikasi Flutter bisa memanggil fungsi ini tanpa error block
+   const corsHeaders = {
+     'Access-Control-Allow-Origin': '*',
+     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+   }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+   serve(async (req) => {
+     // Handle preflight request
+     if (req.method === 'OPTIONS') {
+       return new Response('ok', { headers: corsHeaders })
+     }
 
-  try {
-    const { imageBase64 } = await req.json()
-    const apiKey = Deno.env.get('GEMINI_API_KEY')
-    const genAI = new GoogleGenerativeAI(apiKey!)
-    const prompt = "Analisis struk ini dan kembalikan JSON: {tanggal, nama_merchant, total_pengeluaran, kategori}"
-    const parts = [
-      prompt,
-      { inlineData: { data: imageBase64, mimeType: "image/jpeg" } }
-    ]
+     try {
+       // 1. Terima gambar dari Flutter
+       const { imageBase64 } = await req.json()
+       if (!imageBase64) throw new Error('Gambar tidak ditemukan')
 
-    let result;
-    try {
-      // First try with the faster flash model
-      const modelFlash = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
-      result = await modelFlash.generateContent(parts)
-    } catch (e) {
-      // Fallback to pro model if flash is experiencing high demand (503) or 404
-      console.log("gemini-1.5-flash failed, falling back to gemini-1.5-pro. Error:", e.message)
-      const modelPro = genAI.getGenerativeModel({ model: "gemini-1.5-pro" })
-      result = await modelPro.generateContent(parts)
-    }
+       // 2. Ambil API Key dari brankas rahasia Supabase
+       const apiKey = Deno.env.get('GEMINI_API_KEY')
+       if (!apiKey) throw new Error('API Key belum di-setting di server')
 
-    let responseText = result.response.text()
-    
-    // Hapus format markdown ```json dan ``` jika ada
-    responseText = responseText.replace(/```json/gi, '').replace(/```/g, '').trim()
-    
-    return new Response(responseText, {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-})
+       const genAI = new GoogleGenerativeAI(apiKey)
+
+       // 3. Aturan ketat JSON Schema agar data tidak bocor/rusak
+       const model = genAI.getGenerativeModel({
+         model: "gemini-2.5-flash",
+         generationConfig: {
+           responseMimeType: "application/json",
+           temperature: 0.1, // Suhu rendah agar AI tidak mengobrol
+           responseSchema: {
+             type: SchemaType.OBJECT,
+             properties: {
+               tanggal: { type: SchemaType.STRING, description: "Format YYYY-MM-DD" },
+               nama_merchant: { type: SchemaType.STRING },
+               total_pengeluaran: { type: SchemaType.NUMBER },
+               kategori: { type: SchemaType.STRING, description: "makanan, transportasi, belanja, tagihan, kesehatan, hiburan, atau lainnya" },
+             },
+             required: ["tanggal", "nama_merchant", "total_pengeluaran", "kategori"]
+           }
+         }
+       })
+
+       // 4. Perintahkan Gemini
+       const prompt = "Ekstrak data dari struk belanja ini. Kembalikan HANYA format JSON."
+       const imagePart = { inlineData: { data: imageBase64, mimeType: "image/jpeg" } }
+
+       const result = await model.generateContent([prompt, imagePart])
+       
+       // 5. Kembalikan hasil JSON ke Flutter
+       return new Response(
+         result.response.text(), 
+         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+       )
+
+     } catch (error) {
+       return new Response(
+         JSON.stringify({ error: error.message }),
+         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+       )
+     }
+   })

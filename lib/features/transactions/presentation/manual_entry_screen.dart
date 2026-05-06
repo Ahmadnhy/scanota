@@ -29,7 +29,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
   bool _isAnalyzingImage = false;
   XFile? _selectedImage;
 
-  List<String> _categories = ['makanan', 'transportasi', 'belanja', 'tagihan', 'kesehatan', 'hiburan', 'lainnya'];
+  final List<String> _categories = ['makanan', 'transportasi', 'belanja', 'tagihan', 'kesehatan', 'hiburan', 'lainnya'];
 
   @override
   void initState() {
@@ -111,12 +111,6 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
 
       if (mounted) {
         AppNotification.show(context, 'Transaction saved successfully!');
-        ref.invalidate(transactionsStreamProvider);
-        ref.invalidate(monthlyTotalProvider);
-        ref.invalidate(todayTotalProvider);
-        ref.invalidate(yesterdayTotalProvider);
-        ref.invalidate(weeklyTotalProvider);
-        ref.invalidate(lastMonthTotalProvider);
         context.go('/dashboard');
       }
     } catch (e) {

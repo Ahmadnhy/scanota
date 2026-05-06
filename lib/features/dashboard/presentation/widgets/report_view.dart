@@ -22,11 +22,11 @@ class _ReportViewState extends ConsumerState<ReportView> {
   @override
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(transactionsStreamProvider);
-    final todayTotal = ref.watch(todayTotalProvider).value ?? 0.0;
-    final yesterdayTotal = ref.watch(yesterdayTotalProvider).value ?? 0.0;
-    final weeklyTotal = ref.watch(weeklyTotalProvider).value ?? 0.0;
-    final monthlyTotal = ref.watch(monthlyTotalProvider).value ?? 0.0;
-    final lastMonthTotal = ref.watch(lastMonthTotalProvider).value ?? 0.0;
+    final todayTotal = ref.watch(todayTotalProvider);
+    final yesterdayTotal = ref.watch(yesterdayTotalProvider);
+    final weeklyTotal = ref.watch(weeklyTotalProvider);
+    final monthlyTotal = ref.watch(monthlyTotalProvider);
+    final lastMonthTotal = ref.watch(lastMonthTotalProvider);
 
     return Theme(
       data: Theme.of(context).copyWith(
