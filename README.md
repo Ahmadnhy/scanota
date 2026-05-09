@@ -110,4 +110,4 @@ This project is licensed under the MIT License.
 
 ---
 
-Developed by Ahmad nh👾 | [ahmadnh.is-a.dev](https://ahmadnh.is-a.dev)
+**Developed by Ahmad nh👾 | [ahmadnh.is-a.dev](https://ahmadnh.is-a.dev)**
