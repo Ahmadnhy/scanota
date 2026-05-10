@@ -87,11 +87,22 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
   }
 
   Future<ReceiptData> analyzeReceiptBytes(Uint8List bytes, String path) async {
-    final geminiRepo = _ref.read(geminiRepoProvider);
-    final jsonString = await geminiRepo.analyzeReceipt(bytes);
-    final cleanedStr = jsonString.replaceAll(RegExp(r'```(?:json)?\n?'), '').replaceAll('```', '').trim();
+    try {
+      final geminiRepo = _ref.read(geminiRepoProvider);
+      final jsonString = await geminiRepo.analyzeReceipt(bytes);
+      final cleanedStr = jsonString
+          .replaceAll(RegExp(r'```(?:json)?\n?'), '')
+          .replaceAll('```', '')
+          .trim();
 
-    final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
-    return ReceiptData.fromJson(jsonData, path, imageBytes: bytes);
+      final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
+      return ReceiptData.fromJson(jsonData, path, imageBytes: bytes);
+    } catch (e) {
+      String errorMessage = e.toString();
+      if (errorMessage.contains('quota') || errorMessage.contains('limit')) {
+        throw 'QUOTA_LIMIT';
+      }
+      rethrow;
+    }
   }
 }
