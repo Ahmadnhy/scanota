@@ -75,11 +75,13 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
         _selectedCategory = dbCategories.contains(cat) ? cat : 'lainnya';
       });
 
-      if (mounted)
+      if (mounted) {
         AppNotification.show(context, 'Data extracted successfully!');
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         AppNotification.show(context, 'AI failed: $e', isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isAnalyzingImage = false);
     }
@@ -126,8 +128,9 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
         context.go('/dashboard');
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         AppNotification.show(context, 'Failed to save: $e', isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -206,7 +209,7 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
                                                             MainAxisAlignment
                                                                 .center,
                                                         children: [
-                                                          const SizedBox(
+                                                          SizedBox(
                                                             width: 60,
                                                             height: 60,
                                                             child: CircularProgressIndicator(
