@@ -1,5 +1,7 @@
 # 📸 Scanota
 
+**Scanota** is a smart Al app for scanning receipts (OCR) and automatically managing your daily and annual expenses. Start managing your finances!
+
 **Scanota** is a premium, AI-powered financial management application built with Flutter. It revolutionizes how you track expenses by using Google's Gemini AI to automatically scan and extract data from receipt images, saving you time and reducing manual entry errors.
 
 🔗 **Live Demo**: [scanota.vercel.app](https://scanota.vercel.app/)
@@ -108,4 +110,4 @@ This project is licensed under the MIT License.
 
 ---
 
-Developed by Ahmad nh👾 | [ahmadnh.is-a.dev](https://ahmadnh.is-a.dev)
+**Developed by Ahmad nh👾 | [ahmadnh.is-a.dev](https://ahmadnh.is-a.dev)**
