@@ -1,4 +1,4 @@
-# 📸 Scanota
+# Scanota
 
 **Scanota** is a smart Al app for scanning receipts (OCR) and automatically managing your daily and annual expenses. Start managing your finances!
 
