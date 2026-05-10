@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'dart:ui';
-import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/app_notification.dart';
-import '../data/transaction_repository.dart';
 import '../../scanner/presentation/scanner_provider.dart';
+import '../../../core/utils/category_utils.dart';
+import '../data/transaction_repository.dart';
 
 class ManualEntryScreen extends ConsumerStatefulWidget {
   const ManualEntryScreen({super.key});
@@ -20,95 +19,67 @@ class ManualEntryScreen extends ConsumerStatefulWidget {
 
 class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _dateController = TextEditingController();
   final _merchantController = TextEditingController();
+  final _dateController = TextEditingController();
   final _amountController = TextEditingController();
   String _selectedCategory = 'lainnya';
-  bool _isLoading = false;
+  Uint8List? _selectedImage;
+  String? _imagePath;
   bool _isAnalyzingImage = false;
-  XFile? _selectedImage;
-
-  final List<String> _categories = [
-    'makanan',
-    'transportasi',
-    'belanja',
-    'tagihan',
-    'kesehatan',
-    'hiburan',
-    'lainnya',
-  ];
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _dateController.text = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _dateController.text = DateTime.now().toString().split(' ').first;
   }
 
   @override
   void dispose() {
-    _dateController.dispose();
     _merchantController.dispose();
+    _dateController.dispose();
     _amountController.dispose();
     super.dispose();
   }
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final bytes = await image.readAsBytes();
       setState(() {
-        _selectedImage = pickedFile;
+        _selectedImage = bytes;
+        _imagePath = image.path;
       });
     }
   }
 
   Future<void> _generateWithAI() async {
     if (_selectedImage == null) return;
-
-    setState(() {
-      _isAnalyzingImage = true;
-    });
+    setState(() => _isAnalyzingImage = true);
 
     try {
-      final geminiRepo = ref.read(geminiRepoProvider);
-      final bytes = await _selectedImage!.readAsBytes();
-      final jsonString = await geminiRepo.analyzeReceipt(bytes);
-      final cleanedStr =
-          jsonString
-              .replaceAll(RegExp(r'```(?:json)?\n?'), '')
-              .replaceAll('```', '')
-              .trim();
-      final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
+      final scanner = ref.read(scannerControllerProvider.notifier);
+      final result = await scanner.analyzeReceiptBytes(
+        _selectedImage!,
+        _imagePath!,
+      );
 
       setState(() {
-        if (jsonData['tanggal'] != null) {
-          _dateController.text = jsonData['tanggal'];
-        }
-        if (jsonData['nama_merchant'] != null) {
-          _merchantController.text = jsonData['nama_merchant'];
-        }
-        if (jsonData['total_pengeluaran'] != null) {
-          _amountController.text = jsonData['total_pengeluaran'].toString();
-        }
-        if (jsonData['kategori'] != null) {
-          String cat = jsonData['kategori'].toString().toLowerCase();
-          if (!_categories.contains(cat)) {
-            _categories.add(cat);
-          }
-          _selectedCategory = cat;
-        }
+        _merchantController.text = result.merchantName;
+        _dateController.text = result.date;
+        _amountController.text = result.totalAmount.toString();
+
+        final dbCategories = CategoryUtils.getDbCategories();
+        String cat = result.category.toLowerCase();
+        _selectedCategory = dbCategories.contains(cat) ? cat : 'lainnya';
       });
-      if (mounted) {
-        AppNotification.show(context, 'Receipt analyzed successfully!');
-      }
+
+      if (mounted)
+        AppNotification.show(context, 'Data extracted successfully!');
     } catch (e) {
-      if (mounted) {
-        AppNotification.show(
-          context,
-          'Failed to scan receipt: $e',
-          isError: true,
-        );
-      }
+      if (mounted)
+        AppNotification.show(context, 'AI failed: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isAnalyzingImage = false);
     }
@@ -121,42 +92,42 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
     try {
       final repo = ref.read(transactionRepoProvider);
 
-      Uint8List? bytes;
       String? extension;
-      if (_selectedImage != null) {
-        bytes = await _selectedImage!.readAsBytes();
-        // Safely extract extension — on web, XFile.path can be a blob: URL
-        final path = _selectedImage!.path;
-        final lastDot = path.lastIndexOf('.');
-        if (lastDot != -1 && lastDot < path.length - 1) {
+      if (_selectedImage != null && _imagePath != null) {
+        final lastDot = _imagePath!.lastIndexOf('.');
+        if (lastDot != -1 && lastDot < _imagePath!.length - 1) {
           extension =
-              path.substring(lastDot + 1).split('?').first.split('/').first;
+              _imagePath!
+                  .substring(lastDot + 1)
+                  .split('?')
+                  .first
+                  .split('/')
+                  .first;
         }
         if (extension == null || extension.isEmpty || extension.length > 5) {
-          extension = 'jpg'; // safe fallback
+          extension = 'jpg';
         }
       }
 
       await repo.insertTransaction(
         date: _dateController.text,
         merchantName: _merchantController.text,
-        amount: double.parse(_amountController.text),
+        amount: double.parse(
+          _amountController.text.replaceAll('.', '').replaceAll(',', '.'),
+        ),
         category: _selectedCategory,
-        imageBytes: bytes,
+        imageBytes: _selectedImage,
         imageExtension: extension,
       );
 
-      // Force refresh the transactions stream so dashboard updates immediately
       ref.invalidate(transactionsProvider);
-
       if (mounted) {
-        AppNotification.show(context, 'Transaction saved successfully!');
+        AppNotification.show(context, 'Transaction saved!');
         context.go('/dashboard');
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         AppNotification.show(context, 'Failed to save: $e', isError: true);
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -165,328 +136,476 @@ class _ManualEntryScreenState extends ConsumerState<ManualEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Manual Entry',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          onPressed: () => context.pop(),
+        ),
       ),
-      extendBodyBehindAppBar: true,
-      body: Container(
-        height: double.infinity,
-        decoration: BoxDecoration(gradient: AppColors.headerGradient),
-        child: SafeArea(
-          child:
-              _isLoading
-                  ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  )
-                  : SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Image Picker Box
-                          GestureDetector(
-                            onTap: _pickImage,
-                            child: Center(
-                              child: Container(
-                                constraints: const BoxConstraints(maxHeight: 320),
-                                child: AspectRatio(
-                                  aspectRatio: 1,
-                                  child: Container(
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(24),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.1),
-                                          blurRadius: 20,
-                                          offset: const Offset(0, 10),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        if (_selectedImage != null)
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(24),
-                                            child: FutureBuilder<Uint8List>(
-                                              future: _selectedImage!.readAsBytes(),
-                                              builder: (context, snapshot) {
-                                                if (snapshot.hasData) {
-                                                  return Image.memory(
-                                                    snapshot.data!,
-                                                    width: double.infinity,
-                                                    height: double.infinity,
-                                                    fit: BoxFit.contain,
-                                                  );
-                                                }
-                                                return const Center(child: CircularProgressIndicator());
-                                              },
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+              : SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: GestureDetector(
+                          onTap: _pickImage,
+                          child: Container(
+                            constraints: const BoxConstraints(maxHeight: 320),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.grey.shade200,
+                                width: 2,
+                              ),
+                            ),
+                            child: AspectRatio(
+                              aspectRatio: 1,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(22),
+                                child:
+                                    _selectedImage != null
+                                        ? Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            Image.memory(
+                                              _selectedImage!,
+                                              fit: BoxFit.contain,
                                             ),
-                                          )
-                                        else
-                                          Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.add_a_photo_outlined,
-                                                size: 48,
-                                                color: AppColors.primary.withValues(alpha: 0.5),
+                                            if (_isAnalyzingImage)
+                                              ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(24),
+                                                child: BackdropFilter(
+                                                  filter: ImageFilter.blur(
+                                                    sigmaX: 8,
+                                                    sigmaY: 8,
+                                                  ),
+                                                  child: Container(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.7),
+                                                    child: const Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          const SizedBox(
+                                                            width: 60,
+                                                            height: 60,
+                                                            child: CircularProgressIndicator(
+                                                              color:
+                                                                  AppColors
+                                                                      .primary,
+                                                              strokeWidth: 6,
+                                                            ),
+                                                          ),
+                                                          SizedBox(height: 16),
+                                                          Text(
+                                                            'AI is analyzing your receipt...',
+                                                            style: TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              color:
+                                                                  AppColors
+                                                                      .darkText,
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
                                               ),
-                                              const SizedBox(height: 16),
-                                              Text(
-                                                'Upload Receipt (Optional)',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade600,
-                                                  fontWeight: FontWeight.bold,
+                                          ],
+                                        )
+                                        : Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.add_a_photo_rounded,
+                                              size: 48,
+                                              color: Colors.grey.shade300,
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              'Add Receipt Image (Optional)',
+                                              style: TextStyle(
+                                                color: Colors.grey.shade500,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      if (_selectedImage != null && !_isAnalyzingImage) ...[
+                        const SizedBox(height: 16),
+                        Center(
+                          child: ElevatedButton.icon(
+                            onPressed: _generateWithAI,
+                            icon: const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                            label: const Text('Fill with AI Analysis'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 32),
+
+                      _buildCleanContainer(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildFieldLabel('Merchant Name'),
+                            TextFormField(
+                              controller: _merchantController,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              decoration: _inputDecoration(
+                                Icons.store_rounded,
+                                'e.g. Starbucks',
+                              ),
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildFieldLabel('Date'),
+                            TextFormField(
+                              controller: _dateController,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                              decoration: _inputDecoration(
+                                Icons.calendar_today_rounded,
+                                'YYYY-MM-DD',
+                              ),
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildFieldLabel('Total Amount'),
+                            TextFormField(
+                              controller: _amountController,
+                              keyboardType: TextInputType.number,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                              decoration: _inputDecoration(
+                                Icons.payments_rounded,
+                                '0.00',
+                              ).copyWith(
+                                prefixIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(width: 16),
+                                    const Icon(
+                                      Icons.payments_rounded,
+                                      size: 20,
+                                      color: AppColors.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Rp ',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.darkText,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            _buildFieldLabel('Category'),
+                            DropdownButtonFormField<String>(
+                              value: _selectedCategory,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.darkText,
+                                fontSize: 14,
+                              ),
+                              decoration: _inputDecoration(
+                                Icons.category_rounded,
+                                '',
+                              ),
+                              items:
+                                  CategoryUtils.getDbCategories().map((c) {
+                                    return DropdownMenuItem(
+                                      value: c,
+                                      child: Text(CategoryUtils.getUiName(c)),
+                                    );
+                                  }).toList(),
+                              onChanged:
+                                  (v) => setState(() => _selectedCategory = v!),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _saveTransaction,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Save Transaction',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder:
+                                  (context) => Dialog(
+                                    backgroundColor: Colors.transparent,
+                                    elevation: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(32),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            blurRadius: 40,
+                                            spreadRadius: 10,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              color: Colors.redAccent
+                                                  .withValues(alpha: 0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.warning_amber_rounded,
+                                              color: Colors.redAccent,
+                                              size: 32,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 24),
+                                          const Text(
+                                            'Discard Entry?',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.darkText,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Are you sure you want to discard this entry? All unsaved data will be lost.',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 32),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: TextButton(
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                      ),
+                                                  style: TextButton.styleFrom(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 16,
+                                                        ),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            16,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  child: const Text(
+                                                    'Keep Editing',
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        Colors.redAccent,
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          vertical: 16,
+                                                        ),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            16,
+                                                          ),
+                                                    ),
+                                                    elevation: 0,
+                                                  ),
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    context.pop();
+                                                  },
+                                                  child: const Text(
+                                                    'Discard',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
                                             ],
                                           ),
-                                        if (_isAnalyzingImage)
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(24),
-                                            child: BackdropFilter(
-                                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                              child: Container(
-                                                color: Colors.white.withValues(alpha: 0.7),
-                                                child: Center(
-                                                  child: Column(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
-                                                    children: [
-                                                      Container(
-                                                        padding: const EdgeInsets.all(16),
-                                                        decoration: const BoxDecoration(
-                                                          color: Colors.white,
-                                                          shape: BoxShape.circle,
-                                                        ),
-                                                        child: const SizedBox(
-                                                          width: 32,
-                                                          height: 32,
-                                                          child: CircularProgressIndicator(
-                                                            color: AppColors.primary,
-                                                            strokeWidth: 3,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      const SizedBox(height: 16),
-                                                      const Text(
-                                                        'AI Processing...',
-                                                        style: TextStyle(
-                                                          color: AppColors.darkText,
-                                                          fontWeight: FontWeight.bold,
-                                                          fontSize: 14,
-                                                          letterSpacing: 0.5,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-
-                          if (_selectedImage != null && !_isAnalyzingImage) ...[
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _generateWithAI,
-                                icon: const Icon(
-                                  Icons.auto_awesome_rounded,
-                                  color: Colors.white,
-                                ),
-                                label: const Text(
-                                  'Generate With AI',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.black,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-
-                          const SizedBox(height: 32),
-
-                          _buildSectionTitle('Transaction Details'),
-                          const SizedBox(height: 16),
-
-                          _buildFieldLabel('Date'),
-                          TextFormField(
-                            controller: _dateController,
-                            decoration: const InputDecoration(
-                              hintText: 'YYYY-MM-DD',
-                              prefixIcon: Icon(
-                                Icons.calendar_today_rounded,
-                                size: 20,
-                              ),
-                            ),
-                            validator:
-                                (v) => v!.isEmpty ? 'Date is required' : null,
-                          ),
-                          const SizedBox(height: 20),
-
-                          _buildFieldLabel('Merchant Name'),
-                          TextFormField(
-                            controller: _merchantController,
-                            decoration: const InputDecoration(
-                              hintText: 'e.g. Starbucks, Indomaret',
-                              prefixIcon: Icon(Icons.store_rounded, size: 20),
-                            ),
-                            validator:
-                                (v) =>
-                                    v!.isEmpty
-                                        ? 'Merchant name is required'
-                                        : null,
-                          ),
-                          const SizedBox(height: 20),
-
-                          _buildFieldLabel('Total Amount'),
-                          TextFormField(
-                            controller: _amountController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              hintText: '0.00',
-                              prefixIcon: Icon(
-                                Icons.payments_rounded,
-                                size: 20,
-                              ),
-                              prefixText: 'Rp ',
-                            ),
-                            validator:
-                                (v) => v!.isEmpty ? 'Amount is required' : null,
-                          ),
-                          const SizedBox(height: 20),
-
-                          _buildFieldLabel('Category'),
-                          DropdownButtonFormField<String>(
-                            value: _selectedCategory,
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(
-                                Icons.category_rounded,
-                                size: 20,
-                              ),
-                            ),
-                            items:
-                                _categories.map((c) {
-                                  return DropdownMenuItem(
-                                    value: c,
-                                    child: Text(
-                                      c.toUpperCase(),
-                                      style: const TextStyle(fontSize: 14),
-                                    ),
-                                  );
-                                }).toList(),
-                            onChanged:
-                                (v) => setState(() => _selectedCategory = v!),
-                          ),
-
-                          const SizedBox(height: 48),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Colors.black, // Dark active color
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                              ),
-                              onPressed: _saveTransaction,
-                              child: const Text(
-                                'Save Transaction',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
+                          child: const Text(
+                            'Discard',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 56,
-                            child: ElevatedButton(
-                              onPressed: () => context.pop(),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: Colors.redAccent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                side: const BorderSide(
-                                  color: Colors.redAccent,
-                                  width: 1,
-                                ),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                'Discard',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 40),
+                    ],
                   ),
-        ),
-      ),
+                ),
+              ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w800,
-        color: AppColors.darkText,
+  Widget _buildCleanContainer({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
+      child: child,
+    );
+  }
+
+  InputDecoration _inputDecoration(IconData icon, String hint) {
+    return InputDecoration(
+      hintText: hint,
+      prefixIcon: Icon(icon, size: 20, color: AppColors.primary),
+      filled: true,
+      fillColor: Colors.grey.shade50,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
   Widget _buildFieldLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         label,
         style: TextStyle(
           fontWeight: FontWeight.bold,
-          color: AppColors.darkText.withValues(alpha: 0.7),
-          fontSize: 13,
+          color: Colors.grey.shade500,
+          fontSize: 12,
+          letterSpacing: 0.5,
         ),
       ),
     );

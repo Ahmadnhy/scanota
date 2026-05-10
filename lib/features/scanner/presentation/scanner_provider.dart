@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -22,13 +23,10 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
 
   Future<void> processReceipt(ImageSource source) async {
     try {
-      state = const AsyncValue.loading();
-
       final XFile? image = await _picker.pickImage(source: source);
-      if (image == null) {
-        state = const AsyncValue.data(null);
-        return;
-      }
+      if (image == null) return;
+
+      state = const AsyncValue.loading();
 
       final bytes = await image.readAsBytes();
 
@@ -43,24 +41,25 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
 
       state = const AsyncValue.data(null);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      String errorMessage = e.toString();
+      if (errorMessage.contains('quota') || errorMessage.contains('limit')) {
+        errorMessage = 'QUOTA_LIMIT';
+      }
+      state = AsyncValue.error(errorMessage, st);
     }
   }
 
   Future<void> processReceiptFromFile() async {
     try {
-      state = const AsyncValue.loading();
-
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
         withData: true,
       );
 
-      if (result == null || result.files.isEmpty) {
-        state = const AsyncValue.data(null);
-        return;
-      }
+      if (result == null || result.files.isEmpty) return;
+
+      state = const AsyncValue.loading();
 
       final file = result.files.first;
       final bytes = file.bytes;
@@ -79,7 +78,20 @@ class ScannerController extends StateNotifier<AsyncValue<void>> {
 
       state = const AsyncValue.data(null);
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      String errorMessage = e.toString();
+      if (errorMessage.contains('quota') || errorMessage.contains('limit')) {
+        errorMessage = 'QUOTA_LIMIT';
+      }
+      state = AsyncValue.error(errorMessage, st);
     }
+  }
+
+  Future<ReceiptData> analyzeReceiptBytes(Uint8List bytes, String path) async {
+    final geminiRepo = _ref.read(geminiRepoProvider);
+    final jsonString = await geminiRepo.analyzeReceipt(bytes);
+    final cleanedStr = jsonString.replaceAll(RegExp(r'```(?:json)?\n?'), '').replaceAll('```', '').trim();
+
+    final Map<String, dynamic> jsonData = jsonDecode(cleanedStr);
+    return ReceiptData.fromJson(jsonData, path, imageBytes: bytes);
   }
 }

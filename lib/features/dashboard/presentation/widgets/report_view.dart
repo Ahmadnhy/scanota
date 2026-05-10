@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/category_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -18,16 +19,12 @@ class ReportView extends ConsumerStatefulWidget {
 class _ReportViewState extends ConsumerState<ReportView> {
   String _searchQuery = '';
   String _selectedCategory = 'All';
-  final List<String> _categories = ['All', 'makanan', 'transportasi', 'belanja', 'tagihan', 'kesehatan', 'lainnya'];
+  final List<String> _categories = ['All', ...CategoryUtils.getDbCategories()];
+  int _touchedPieIndex = -1;
 
   @override
   Widget build(BuildContext context) {
     final transactionsAsync = ref.watch(transactionsProvider);
-    final todayTotal = ref.watch(todayTotalProvider);
-    final yesterdayTotal = ref.watch(yesterdayTotalProvider);
-    final weeklyTotal = ref.watch(weeklyTotalProvider);
-    final monthlyTotal = ref.watch(monthlyTotalProvider);
-    final lastMonthTotal = ref.watch(lastMonthTotalProvider);
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -36,133 +33,240 @@ class _ReportViewState extends ConsumerState<ReportView> {
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          title: const Text('Analytics Report', style: TextStyle(fontWeight: FontWeight.bold)),
-          centerTitle: true,
           backgroundColor: Colors.white,
           elevation: 0,
+          toolbarHeight: 0, // Hide the standard app bar title
         ),
         body: transactionsAsync.when(
           data: (data) {
-            // Filtering logic
-            final filteredData = data.where((t) {
-              final matchesSearch = t.merchantName.toLowerCase().contains(_searchQuery.toLowerCase());
-              final matchesCategory = _selectedCategory == 'All' || t.category.toLowerCase() == _selectedCategory.toLowerCase();
-              return matchesSearch && matchesCategory;
-            }).toList();
-
-            // Sectioned logic
+            // Process data once per build
+            // Process data: Move processing logic to avoid redundant work
             final now = DateTime.now();
-            final yesterday = now.subtract(const Duration(days: 1));
-            
-            final todayData = filteredData.where((t) => t.createdAt.year == now.year && t.createdAt.month == now.month && t.createdAt.day == now.day).toList();
-            final yesterdayData = filteredData.where((t) => t.createdAt.year == yesterday.year && t.createdAt.month == yesterday.month && t.createdAt.day == yesterday.day).toList();
-            
-            final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-            final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
-            
-            final weekData = filteredData.where((t) {
-              final tDate = DateTime(t.createdAt.year, t.createdAt.month, t.createdAt.day);
-              return (tDate.isAtSameMomentAs(startOfWeekDate) || tDate.isAfter(startOfWeekDate)) &&
-                     !todayData.contains(t) && !yesterdayData.contains(t);
-            }).toList();
-            
-            final monthData = filteredData.where((t) {
-              return t.createdAt.year == now.year && t.createdAt.month == now.month &&
-                     !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t);
-            }).toList();
+            final todayStart = DateTime(now.year, now.month, now.day);
+            final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+            final weekStart = todayStart.subtract(
+              Duration(days: now.weekday - 1),
+            );
 
-            final olderData = filteredData.where((t) {
-              return !todayData.contains(t) && !yesterdayData.contains(t) && !weekData.contains(t) && !monthData.contains(t);
-            }).toList();
+            // Filtering and grouping in one pass
+            final List<TransactionModel> todayData = [];
+            final List<TransactionModel> yesterdayData = [];
+            final List<TransactionModel> weekData = [];
+            final List<TransactionModel> monthData = [];
+            final List<TransactionModel> olderData = [];
+            final List<TransactionModel> filteredData = [];
+            double totalExpenses = 0;
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.headerGradient,
-                      borderRadius: BorderRadius.circular(24),
+            for (final t in data) {
+              final matchesSearch =
+                  _searchQuery.isEmpty ||
+                  t.merchantName.toLowerCase().contains(
+                    _searchQuery.toLowerCase(),
+                  );
+              final matchesCategory =
+                  _selectedCategory == 'All' ||
+                  t.category.toLowerCase() == _selectedCategory.toLowerCase();
+
+              if (matchesSearch && matchesCategory) {
+                filteredData.add(t);
+                totalExpenses += t.amount;
+                final tDate = DateTime(
+                  t.createdAt.year,
+                  t.createdAt.month,
+                  t.createdAt.day,
+                );
+
+                if (tDate.isAtSameMomentAs(todayStart)) {
+                  todayData.add(t);
+                } else if (tDate.isAtSameMomentAs(yesterdayStart)) {
+                  yesterdayData.add(t);
+                } else if (tDate.isAfter(
+                  weekStart.subtract(const Duration(seconds: 1)),
+                )) {
+                  weekData.add(t);
+                } else if (t.createdAt.year == now.year &&
+                    t.createdAt.month == now.month) {
+                  monthData.add(t);
+                } else {
+                  olderData.add(t);
+                }
+              }
+            }
+
+            return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Text(
+                        'Analytics Report',
+                        style: GoogleFonts.outfit(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.darkText,
+                        ),
+                      ),
                     ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(24),
+                  sliver: SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Total Expenses', style: TextStyle(color: Colors.black.withValues(alpha: 0.8), fontSize: 14)),
-                        const SizedBox(height: 8),
-                        Text('Rp ${NumberFormat("#,###", "id_ID").format(filteredData.fold(0.0, (sum, item) => sum + item.amount))}', style: const TextStyle(color: Colors.black, fontSize: 32, fontWeight: FontWeight.bold)),
+                        // Total Expenses Card
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            gradient: AppColors.headerGradient,
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Total Expenses',
+                                style: TextStyle(
+                                  color: Colors.black.withValues(alpha: 0.8),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Rp ${NumberFormat("#,###", "id_ID").format(totalExpenses)}',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Optimized Summary Watchers
+                        const _SummarySection(),
+                        const SizedBox(height: 32),
+
+                        // Search Bar
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: TextField(
+                            onChanged:
+                                (value) => setState(() => _searchQuery = value),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Search merchant or category...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontWeight: FontWeight.normal,
+                              ),
+                              prefixIcon: Icon(
+                                Icons.search_rounded,
+                                color: AppColors.primary.withValues(alpha: 0.5),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 18,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Category Filter
+                        SizedBox(
+                          height: 40,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _categories.length,
+                            itemBuilder: (context, index) {
+                              final cat = _categories[index];
+                              final isSelected = _selectedCategory == cat;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChoiceChip(
+                                  label: Text(
+                                    cat == 'All'
+                                        ? 'All'
+                                        : CategoryUtils.getUiName(cat),
+                                  ),
+                                  selected: isSelected,
+                                  onSelected:
+                                      (selected) => setState(
+                                        () => _selectedCategory = cat,
+                                      ),
+                                  selectedColor: Colors.black,
+                                  labelStyle: TextStyle(
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : AppColors.darkText,
+                                    fontSize: 12,
+                                  ),
+                                  showCheckmark: false,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Charts Section
+                        _buildInteractiveCard(
+                          title: 'Category Distribution',
+                          child: _buildPieChartSample2(filteredData),
+                          onTap:
+                              () => _showChartDetail(
+                                context,
+                                'Category Distribution',
+                                _processCategoryData(filteredData),
+                                isPie: true,
+                              ),
+                        ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
 
-                  _buildSummarySection(todayTotal, yesterdayTotal, weeklyTotal, monthlyTotal, lastMonthTotal),
-                  const SizedBox(height: 32),
+                // Transaction Sections
+                ..._buildSliverSection('TODAY', todayData, showEmpty: true),
+                ..._buildSliverSection('YESTERDAY', yesterdayData),
+                ..._buildSliverSection('THIS WEEK', weekData),
+                ..._buildSliverSection('THIS MONTH', monthData),
+                ..._buildSliverSection('OLDER', olderData),
 
-                  // Search Bar
-                  TextField(
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                    decoration: InputDecoration(
-                      hintText: 'Search transactions...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Category Filter
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      itemBuilder: (context, index) {
-                        final cat = _categories[index];
-                        final isSelected = _selectedCategory == cat;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(cat[0].toUpperCase() + cat.substring(1)),
-                            selected: isSelected,
-                            onSelected: (selected) => setState(() => _selectedCategory = cat),
-                            selectedColor: Colors.black,
-                            labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.darkText, fontSize: 12),
-                            showCheckmark: false,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Small Charts Section
-                  Row(
-                    children: [
-                      Expanded(child: _buildSmallPieChart(data)),
-                      const SizedBox(width: 16),
-                      Expanded(child: _buildSmallBarChart(data)),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Sectioned List
-                  _buildSection('TODAY', todayData, showEmpty: true),
-                  const SizedBox(height: 24),
-                  _buildSection('YESTERDAY', yesterdayData, showEmpty: true),
-                  const SizedBox(height: 24),
-                  _buildSection('THIS WEEK', weekData, showEmpty: true),
-                  const SizedBox(height: 24),
-                  _buildSection('THIS MONTH', monthData, showEmpty: true),
-                  const SizedBox(height: 24),
-                  _buildSection('OLDER', olderData, showEmpty: true),
-                  const SizedBox(height: 40),
-                ],
-              ),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -172,79 +276,336 @@ class _ReportViewState extends ConsumerState<ReportView> {
     );
   }
 
-  Widget _buildSmallPieChart(List<TransactionModel> data) {
-    final catMap = _processCategoryData(data);
-    return Container(
-      height: 180,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(24)),
-      child: Column(
-        children: [
-          const Text('By Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          const SizedBox(height: 16),
-          Expanded(
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 20,
-                sections: catMap.entries.map((e) {
-                  return PieChartSectionData(
-                    color: _getCategoryColor(e.key),
-                    value: e.value,
-                    title: '',
-                    radius: 15,
-                  );
-                }).toList(),
-              ),
+  Widget _buildInteractiveCard({
+    required String title,
+    required Widget child,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 280, // Fixed height to prevent unbounded constraint error
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: AppColors.darkText,
+                  ),
+                ),
+                const Icon(
+                  Icons.open_in_new_rounded,
+                  size: 12,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(child: RepaintBoundary(child: child)),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSection(String title, List<TransactionModel> items, {bool showEmpty = false}) {
-    if (items.isEmpty && !showEmpty) return const SizedBox.shrink();
-    final total = items.fold(0.0, (sum, item) => sum + item.amount);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildPieChartSample2(List<TransactionModel> data) {
+    final catMap = _processCategoryData(data);
+    if (catMap.isEmpty) {
+      return const Center(
+        child: Icon(Icons.pie_chart_outline, color: Colors.grey),
+      );
+    }
+
+    final sortedEntries =
+        catMap.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final topEntries = sortedEntries.take(4).toList();
+
+    return Row(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
-            Text('Total -Rp ${NumberFormat("#,###", "id_ID").format(total)}', style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (items.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('Belum ada transaksi.', style: TextStyle(color: Colors.grey)))
-        else
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: items.length,
-            separatorBuilder: (context, index) => const Divider(color: Color(0xFFF1F5F9), height: 32),
-            itemBuilder: (context, index) => _buildTransactionItem(items[index]),
+        Expanded(
+          child: PieChart(
+            PieChartData(
+              pieTouchData: PieTouchData(
+                touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                  if (!mounted) return;
+                  setState(() {
+                    if (!event.isInterestedForInteractions ||
+                        pieTouchResponse == null ||
+                        pieTouchResponse.touchedSection == null) {
+                      _touchedPieIndex = -1;
+                      return;
+                    }
+                    _touchedPieIndex =
+                        pieTouchResponse.touchedSection!.touchedSectionIndex;
+                  });
+                },
+              ),
+              borderData: FlBorderData(show: false),
+              sectionsSpace: 0,
+              centerSpaceRadius: 40,
+              sections:
+                  topEntries.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final e = entry.value;
+                    final isTouched = index == _touchedPieIndex;
+                    final fontSize = isTouched ? 16.0 : 12.0;
+                    final radius = isTouched ? 60.0 : 50.0;
+                    return PieChartSectionData(
+                      color: CategoryUtils.getColor(e.key),
+                      value: e.value,
+                      title:
+                          isTouched
+                              ? 'Rp ${NumberFormat.compact().format(e.value)}'
+                              : '${(e.value / catMap.values.fold(0.0, (s, v) => s + v) * 100).toStringAsFixed(0)}%',
+                      radius: radius,
+                      titleStyle: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: const [
+                          Shadow(color: Colors.black26, blurRadius: 2),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+            ),
           ),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children:
+              topEntries.map((e) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: CategoryUtils.getColor(e.key),
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        CategoryUtils.getUiName(e.key),
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.darkText,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+        ),
       ],
     );
   }
 
-  Widget _buildSmallBarChart(List<TransactionModel> data) {
-    return Container(
-      height: 180,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(24)),
-      child: Column(
-        children: [
-          const Text('Weekly Trend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-          const SizedBox(height: 16),
-          const Expanded(child: Center(child: Icon(Icons.show_chart, color: AppColors.primary, size: 40))),
-          Text('Activity: High', style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
-        ],
-      ),
+  void _showChartDetail(
+    BuildContext context,
+    String title,
+    Map<dynamic, double> data, {
+    bool isPie = false,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder:
+          (context) => Container(
+            height: MediaQuery.of(context).size.height * 0.6,
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: data.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final key = data.keys.elementAt(index);
+                      final val = data.values.elementAt(index);
+                      String label = key.toString();
+                      if (title.contains('Category')) {
+                        label = CategoryUtils.getUiName(label);
+                      }
+                      if (title.contains('Weekly')) {
+                        final days = [
+                          'Mon',
+                          'Tue',
+                          'Wed',
+                          'Thu',
+                          'Fri',
+                          'Sat',
+                          'Sun',
+                        ];
+                        label = days[key % 7];
+                      }
+                      return ListTile(
+                        leading:
+                            isPie
+                                ? Icon(
+                                  CategoryUtils.getIcon(key.toString()),
+                                  color: CategoryUtils.getColor(key.toString()),
+                                )
+                                : const Icon(
+                                  Icons.analytics_outlined,
+                                  color: AppColors.primary,
+                                ),
+                        title: Text(
+                          label,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        trailing: Text(
+                          'Rp ${NumberFormat("#,###", "id_ID").format(val)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
     );
+  }
+
+  List<Widget> _buildSliverSection(
+    String title,
+    List<TransactionModel> items, {
+    bool showEmpty = false,
+  }) {
+    if (items.isEmpty && !showEmpty) return [];
+
+    final total = items.fold(0.0, (sum, item) => sum + item.amount);
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+        sliver: SliverToBoxAdapter(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 1,
+                ),
+              ),
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  children: [
+                    const TextSpan(
+                      text: 'Total ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    TextSpan(
+                      text: '-Rp ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                    TextSpan(
+                      text: NumberFormat("#,###", "id_ID").format(total),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (items.isEmpty)
+        const SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          sliver: SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No transactions found.',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+          ),
+        )
+      else
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final isLast = index == items.length - 1;
+              return Column(
+                children: [
+                  _buildTransactionItem(items[index]),
+                  if (!isLast)
+                    const Divider(color: Color(0xFFF1F5F9), height: 32),
+                  if (isLast) const SizedBox(height: 16),
+                ],
+              );
+            }, childCount: items.length),
+          ),
+        ),
+    ];
   }
 
   Widget _buildTransactionItem(TransactionModel t) {
@@ -263,27 +624,70 @@ class _ReportViewState extends ConsumerState<ReportView> {
         child: Row(
           children: [
             Container(
-              width: 50, height: 50,
-              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
-              child: Icon(_getCategoryIcon(t.category), color: AppColors.primary),
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: CategoryUtils.getColor(
+                  t.category,
+                ).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                CategoryUtils.getIcon(t.category),
+                color: CategoryUtils.getColor(t.category),
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(t.merchantName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                  Text(
+                    t.merchantName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.darkText,
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  _buildPillLabel(t.category.toUpperCase()),
+                  _buildPillLabel(
+                    CategoryUtils.getUiName(t.category).toUpperCase(),
+                    CategoryUtils.getColor(t.category),
+                  ),
                 ],
               ),
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('-Rp ${NumberFormat("#,###", "id_ID").format(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.darkText)),
+                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: '-Rp ',
+                        style: const TextStyle(
+                          fontSize: 16, // Matched to amount font size
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.darkText, // Removed alpha
+                        ),
+                      ),
+                      TextSpan(
+                        text: NumberFormat("#,###", "id_ID").format(t.amount),
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(DateFormat('MMM, d yyyy').format(t.date), style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Text(
+                  DateFormat('MMM, d yyyy').format(t.date),
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
               ],
             ),
           ],
@@ -292,56 +696,60 @@ class _ReportViewState extends ConsumerState<ReportView> {
     );
   }
 
-  Widget _buildPillLabel(String text) {
+  Widget _buildPillLabel(String text, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary, letterSpacing: 0.5),
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: color,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
 
-  Map<String, double> _processCategoryData(List<TransactionModel> transactions) {
+  Map<String, double> _processCategoryData(
+    List<TransactionModel> transactions,
+  ) {
     Map<String, double> data = {};
     for (var t in transactions) {
       data[t.category] = (data[t.category] ?? 0) + t.amount;
     }
     return data;
   }
+}
 
-  Color _getCategoryColor(String category) {
-    switch (category.toLowerCase()) {
-      case 'makanan': return Colors.orange;
-      case 'transportasi': return Colors.blue;
-      case 'belanja': return Colors.purple;
-      case 'tagihan': return Colors.red;
-      case 'kesehatan': return Colors.green;
-      default: return Colors.grey;
-    }
-  }
+class _SummarySection extends ConsumerWidget {
+  const _SummarySection();
 
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'makanan': return Icons.restaurant;
-      case 'transportasi': return Icons.directions_car;
-      case 'belanja': return Icons.shopping_bag;
-      case 'kesehatan': return Icons.health_and_safety;
-      case 'tagihan': return Icons.receipt_long;
-      default: return Icons.account_balance_wallet;
-    }
-  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final today = ref.watch(todayTotalProvider);
+    final yesterday = ref.watch(yesterdayTotalProvider);
+    final weekly = ref.watch(weeklyTotalProvider);
+    final monthly = ref.watch(monthlyTotalProvider);
+    final lastMonth = ref.watch(lastMonthTotalProvider);
 
-  Widget _buildSummarySection(double today, double yesterday, double weekly, double monthly, double lastMonth) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('SUMMARY', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade500, letterSpacing: 1)),
+        Text(
+          'SUMMARY',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade500,
+            letterSpacing: 1,
+          ),
+        ),
         const SizedBox(height: 16),
         _buildSummaryRow('Today', today, isHighlight: true),
         _buildSummaryRow('Yesterday', yesterday),
@@ -352,14 +760,30 @@ class _ReportViewState extends ConsumerState<ReportView> {
     );
   }
 
-  Widget _buildSummaryRow(String label, double amount, {bool isHighlight = false}) {
+  Widget _buildSummaryRow(
+    String label,
+    double amount, {
+    bool isHighlight = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: isHighlight ? AppColors.darkText : Colors.grey.shade600, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
-          Text('-Rp ${NumberFormat("#,###", "id_ID").format(amount)}', style: TextStyle(color: isHighlight ? Colors.redAccent : AppColors.darkText, fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            label,
+            style: TextStyle(
+              color: isHighlight ? AppColors.darkText : Colors.grey.shade600,
+              fontWeight: FontWeight.bold, // Always bold for better visibility
+            ),
+          ),
+          Text(
+            '-Rp ${NumberFormat("#,###", "id_ID").format(amount)}',
+            style: TextStyle(
+              color: isHighlight ? Colors.redAccent : AppColors.darkText,
+              fontWeight: FontWeight.bold, // Always bold for better visibility
+            ),
+          ),
         ],
       ),
     );

@@ -29,7 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             _nameController.text.trim(),
           );
       if (!mounted) return;
-      AppNotification.show(context, 'Registrasi berhasil! Silakan cek email Anda.');
+      AppNotification.show(context, 'Registration successful! Please check your email.');
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
@@ -148,23 +148,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
                       ),
-                      child:
-                          _isLoading
-                              ? const SizedBox(
-                                height: 24,
-                                width: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : const Text(
-                                'Sign Up',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
                               ),
+                            )
+                          : const Text(
+                              'Sign Up',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 24),

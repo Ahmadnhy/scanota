@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/app_notification.dart';
 import 'scanner_provider.dart';
 
 class ScannerScreen extends ConsumerWidget {
@@ -20,13 +21,21 @@ class ScannerScreen extends ConsumerWidget {
           }
         },
         error: (err, stack) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Gagal membaca struk: $err'),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          final errorStr = err.toString();
+          if (errorStr.contains('QUOTA_LIMIT')) {
+            AppNotification.show(
+              context, 
+              'Monthly AI Scanning Limit Reached. Please try again later or upgrade your plan.',
+              isError: true,
+              isCentered: true,
+            );
+          } else {
+            AppNotification.show(
+              context, 
+              'Failed to analyze receipt: $errorStr',
+              isError: true,
+            );
+          }
         },
         loading: () {},
       );

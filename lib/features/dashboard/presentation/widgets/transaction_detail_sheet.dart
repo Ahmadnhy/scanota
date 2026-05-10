@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/utils/category_utils.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -20,7 +21,7 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
   late TextEditingController _merchantController;
   late TextEditingController _amountController;
   late String _selectedCategory;
-  final List<String> _categories = ['makanan', 'transportasi', 'belanja', 'tagihan', 'kesehatan', 'hiburan', 'lainnya'];
+  final List<String> _categories = CategoryUtils.getDbCategories();
 
   @override
   void initState() {
@@ -66,65 +67,83 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
   void _deleteTransaction() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 30, spreadRadius: 10)],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 32),
-              ),
-              const SizedBox(height: 24),
-              const Text('Delete Transaction', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkText)),
-              const SizedBox(height: 8),
-              Text('Are you sure you want to delete this transaction?', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+      builder: (context) {
+        bool isDeleting = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 40, spreadRadius: 10)],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.1), shape: BoxShape.circle),
+                      child: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 32),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
+                    const SizedBox(height: 24),
+                    const Text('Delete Transaction', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkText)),
+                    const SizedBox(height: 8),
+                    Text('This action cannot be undone. Are you sure?', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+                    const SizedBox(height: 32),
+                    if (isDeleting)
+                      const CircularProgressIndicator(color: Colors.redAccent)
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                              child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.redAccent,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                elevation: 0,
+                              ),
+                              onPressed: () async {
+                                setDialogState(() => isDeleting = true);
+                                try {
+                                  await ref.read(transactionRepoProvider).deleteTransaction(widget.transaction.id);
+                                  ref.invalidate(transactionsProvider);
+                                  if (context.mounted) {
+                                    Navigator.pop(context); // Close dialog
+                                    Navigator.pop(context); // Close bottom sheet
+                                    AppNotification.show(context, 'Transaction deleted');
+                                  }
+                                } catch (e) {
+                                  setDialogState(() => isDeleting = false);
+                                  if (context.mounted) {
+                                    AppNotification.show(context, 'Delete failed: $e', isError: true);
+                                  }
+                                }
+                              },
+                              child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
                       ),
-                      onPressed: () async {
-                        Navigator.pop(context); // Close dialog
-                        await ref.read(transactionRepoProvider).deleteTransaction(widget.transaction.id);
-                        ref.invalidate(transactionsProvider);
-                        if (context.mounted) {
-                          Navigator.pop(context); // Close bottom sheet
-                          AppNotification.show(context, 'Transaction deleted');
-                        }
-                      },
-                      child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -151,8 +170,17 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
               if (!_isEditing)
                 Row(
                   children: [
-                    IconButton(icon: const Icon(Icons.edit_rounded, color: AppColors.primary), onPressed: () => setState(() => _isEditing = true)),
-                    IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent), onPressed: _deleteTransaction),
+                    _buildIconButton(
+                      icon: Icons.edit_rounded, 
+                      color: AppColors.primary, 
+                      onTap: () => setState(() => _isEditing = true)
+                    ),
+                    const SizedBox(width: 8),
+                    _buildIconButton(
+                      icon: Icons.delete_outline_rounded, 
+                      color: Colors.redAccent, 
+                      onTap: _deleteTransaction
+                    ),
                   ],
                 ),
             ],
@@ -215,13 +243,13 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
                     DropdownButtonFormField<String>(
                       value: _selectedCategory,
                       decoration: const InputDecoration(prefixIcon: Icon(Icons.category_rounded, size: 20)),
-                      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c.toUpperCase(), style: const TextStyle(fontSize: 14)))).toList(),
+                      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(CategoryUtils.getUiName(c), style: const TextStyle(fontSize: 14)))).toList(),
                       onChanged: (v) => setState(() => _selectedCategory = v!),
                     ),
                   ] else ...[
-                    _buildDetailRow('Merchant', widget.transaction.merchantName, Icons.store_rounded),
+                    _buildDetailRow('Merchant', _toTitleCase(widget.transaction.merchantName), Icons.store_rounded),
                     _buildDetailRow('Date', DateFormat('EEEE, d MMMM yyyy').format(widget.transaction.date), Icons.calendar_today_rounded),
-                    _buildDetailRow('Category', widget.transaction.category.toUpperCase(), Icons.category_rounded),
+                    _buildDetailRow('Category', CategoryUtils.getUiName(widget.transaction.category).toUpperCase(), CategoryUtils.getIcon(widget.transaction.category)),
                     _buildDetailRow('Amount', 'Rp ${NumberFormat("#,###", "id_ID").format(widget.transaction.amount)}', Icons.payments_rounded, isAmount: true),
                     const SizedBox(height: 24),
                     _buildDetailRow('Inputted On', DateFormat('MMM d, yyyy HH:mm').format(widget.transaction.createdAt), Icons.access_time_rounded),
@@ -235,16 +263,27 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
             Row(
               children: [
                 Expanded(
-                  child: TextButton(
+                  child: OutlinedButton(
                     onPressed: () => setState(() {
                       _isEditing = false;
-                      _dateController.text = DateFormat('yyyy-MM-dd').format(widget.transaction.date);
+                      _dateController.text =
+                          DateFormat('yyyy-MM-dd').format(widget.transaction.date);
                       _merchantController.text = widget.transaction.merchantName;
                       _amountController.text = widget.transaction.amount.toString();
                       _selectedCategory = widget.transaction.category.toLowerCase();
                     }),
-                    style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                    child: const Text('Cancel', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.redAccent,
+                      side: const BorderSide(color: Colors.redAccent),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -275,6 +314,29 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
     );
   }
 
+  String _toTitleCase(String text) {
+    if (text.isEmpty) return text;
+    return text.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
+  Widget _buildIconButton({required IconData icon, required Color color, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(String label, String value, IconData icon, {bool isAmount = false}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -288,8 +350,11 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: AppColors.primary, size: 24),
+            decoration: BoxDecoration(
+              color: CategoryUtils.getColor(widget.transaction.category).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: CategoryUtils.getColor(widget.transaction.category), size: 24),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -298,7 +363,38 @@ class _TransactionDetailSheetState extends ConsumerState<TransactionDetailSheet>
               children: [
                 Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(value, style: TextStyle(fontSize: isAmount ? 20 : 16, fontWeight: isAmount ? FontWeight.w800 : FontWeight.bold, color: AppColors.darkText)),
+                if (isAmount)
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: AppColors.darkText,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      children: [
+                        TextSpan(
+                          text: '-Rp ',
+                          style: const TextStyle(
+                            fontSize: 18, // Matched to amount font size
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.darkText, // Removed alpha and added bold
+                          ),
+                        ),
+                        TextSpan(
+                          text: value.replaceFirst('Rp ', ''),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800), // Reduced from 22 to 18
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.darkText,
+                    ),
+                  ),
               ],
             ),
           ),

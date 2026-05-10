@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../core/utils/app_notification.dart';
 import '../../../core/constants/app_colors.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -66,15 +67,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated successfully!')),
-      );
+      AppNotification.show(context, 'Profile updated successfully!');
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
-      );
+      AppNotification.show(context, 'Error: $e', isError: true, isCentered: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
